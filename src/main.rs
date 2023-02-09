@@ -1,5 +1,9 @@
 use crate::compare::compare_img;
-use std::{env, path::PathBuf};
+use std::{
+    env,
+    path::PathBuf,
+    thread::{self, JoinHandle},
+};
 
 mod cache;
 mod compare;
@@ -32,20 +36,23 @@ fn main() {
 
     match entries {
         Ok(entries) => {
-            let mut entries_b = entries.to_vec();
+            let mut handles: Vec<JoinHandle<()>> = vec![];
 
-            for entry in entries {
-                entries_b.remove(0);
-                if entries_b.len() < 1 {
-                    break;
-                }
-
+            let entries_iter = entries.clone().into_iter();
+            for entry in entries_iter {
                 println!("{} vs:", entry.display());
+                let entries_b = entries.clone();
 
-                match compare_img(&entry, &entries_b) {
-                    Ok(()) => println!("done!"),
-                    Err(err) => println!("Error: {}", err),
-                }
+                handles.push(thread::spawn(move || {
+                    match compare_img(&entry, &entries_b) {
+                        Ok(()) => println!("done!"),
+                        Err(err) => println!("Error: {}", err),
+                    };
+                }))
+            }
+
+            for handle in handles {
+                handle.join().unwrap();
             }
         }
         Err(err) => print_usage(err),
