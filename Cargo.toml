@@ -1,0 +1,11 @@
+[package]
+name = "dupimg"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+dssim-core = "3.2.5"
+image = "0.24.5"
+imgref = "1.9.4"
