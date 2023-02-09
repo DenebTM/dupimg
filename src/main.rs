@@ -40,14 +40,11 @@ fn main() {
 
             let entries_iter = entries.clone().into_iter();
             for entry in entries_iter {
-                println!("{} vs:", entry.display());
                 let entries_b = entries.clone();
 
                 handles.push(thread::spawn(move || {
-                    match compare_img(&entry, &entries_b) {
-                        Ok(()) => println!("done!"),
-                        Err(err) => println!("Error: {}", err),
-                    };
+                    compare_img(&entry, &entries_b)
+                        .unwrap_or_else(|err| println!("Error: {}", err));
                 }))
             }
 

@@ -6,4 +6,6 @@ use lazy_static::lazy_static;
 lazy_static! {
     pub static ref SCALED_IMG_CACHE: Mutex<HashMap<PathBuf, DssimImage<f32>>> =
         Mutex::new(HashMap::new());
+    pub static ref ALREADY_CHECKED_CACHE: Mutex<HashMap<PathBuf, Vec<PathBuf>>> =
+        Mutex::new(HashMap::new());
 }
