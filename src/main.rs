@@ -1,6 +1,7 @@
 use crate::compare::compare_img;
 use std::{env, path::PathBuf};
 
+mod cache;
 mod compare;
 
 fn main() {
@@ -33,17 +34,17 @@ fn main() {
         Ok(entries) => {
             let mut entries_b = entries.to_vec();
 
-            for e in entries {
+            for entry in entries {
                 entries_b.remove(0);
                 if entries_b.len() < 1 {
                     break;
                 }
 
-                println!("{} vs:", e.display());
+                println!("{} vs:", entry.display());
 
-                match compare_img(&e, &entries_b) {
+                match compare_img(&entry, &entries_b) {
                     Ok(()) => println!("done!"),
-                    Err(e) => println!("Error: {}", e),
+                    Err(err) => println!("Error: {}", err),
                 }
             }
         }
