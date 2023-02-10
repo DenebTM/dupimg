@@ -1,6 +1,6 @@
 # dupimg
 
-A simple duplicate image checker.
+A simple duplicate image finder.
 
 ## Summary
 
@@ -16,7 +16,9 @@ Note: I am rather inexperienced with Rust, so there will definitely be some
 dumb code here.
 
 ## Installation
-Clone this repository and run `cargo install --path .`
+
+Either run `cargo install dupimg`, or clone this repository and run
+`cargo install --path .` from the project root.
 
 ## Basic usage
 

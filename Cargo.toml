@@ -1,7 +1,8 @@
 [package]
 name = "dupimg"
 version = "0.1.0"
-description = "A simple duplicate image checker"
+description = "A simple duplicate image finder"
+categories = ["command-line-utilities", "multimedia::images"]
 readme = true
 repository = "https://github.com/DenebTM/dupimg"
 license = "AGPL-3.0"
