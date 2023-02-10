@@ -4,7 +4,7 @@ use dssim_core::{Dssim, DssimImage};
 use image::{imageops::FilterType, ImageError};
 use imgref::Img;
 
-use crate::cache::{ALREADY_CHECKED_CACHE, SCALED_IMG_CACHE};
+use crate::cache::{PathPair, ALREADY_CHECKED_CACHE, SCALED_IMG_CACHE};
 
 static SCALED_SIZE: u32 = 200;
 
@@ -21,22 +21,21 @@ pub fn compare_img(img_path: &PathBuf, other: &Vec<PathBuf>) -> Result<(), Image
             continue;
         }
 
+        // check if the combination of img_path/other_path or other_path/img_path has already been checked
         let mut comp_cache = ALREADY_CHECKED_CACHE.lock().unwrap();
-        if comp_cache.contains_key(img_path) {
-            let mut comp_cache_row = comp_cache.get(img_path).unwrap();
-            if comp_cache_row.contains(other_path) {
-                continue;
-            } else if comp_cache.contains_key(other_path) {
-                comp_cache_row = comp_cache.get(other_path).unwrap();
-                if comp_cache_row.contains(img_path) {
-                    continue;
-                }
-            }
-        } else {
-            comp_cache.insert(img_path.to_owned(), Vec::new());
+        if comp_cache.contains(&PathPair {
+            0: img_path.to_owned(),
+            1: other_path.to_owned(),
+        }) || comp_cache.contains(&PathPair {
+            0: other_path.to_owned(),
+            1: img_path.to_owned(),
+        }) {
+            continue;
         }
-        let comp_cache_row = comp_cache.get_mut(img_path).unwrap();
-        comp_cache_row.push(other_path.to_owned());
+        comp_cache.insert(PathPair {
+            0: img_path.to_owned(),
+            1: other_path.to_owned(),
+        });
         drop(comp_cache);
 
         let img_b = dssim_from_path(other_path, &d).unwrap();
@@ -61,7 +60,7 @@ fn dssim_from_path(path: &PathBuf, dssim: &Dssim) -> Result<DssimImage<f32>, Ima
         drop(cache);
         let img = ImageReader::open(path)?
             .decode()?
-            .resize(SCALED_SIZE, SCALED_SIZE, FilterType::Nearest)
+            .resize_exact(SCALED_SIZE, SCALED_SIZE, FilterType::Nearest)
             .into_rgb32f();
 
         // Dssim/imgref wrapper struct for the second image to be compared
