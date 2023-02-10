@@ -12,7 +12,7 @@ static SCALED_SIZE: u32 = 200;
 pub fn compare_imgs(
     img_path: &PathBuf,
     other: &Vec<PathBuf>,
-    threshold: Option<f64>,
+    threshold: f64,
 ) -> Result<(), ImageError> {
     if other.len() == 0 {
         return Ok(());
@@ -31,12 +31,12 @@ fn compare_img(
     path2: &PathBuf,
     img1: &DssimImage<f32>,
     dssim: &Dssim,
-    threshold: Option<f64>,
+    threshold: f64,
 ) -> Result<(), ImageError> {
     if !already_checked(path1.to_owned(), path2.to_owned()) {
         let img2 = dssim_from_path(path2, &dssim)?;
         let (diff, _) = dssim.compare(img1, &img2);
-        if threshold.is_none() || diff <= threshold.unwrap() {
+        if diff <= threshold {
             println!(
                 "\n'{}'\n'{}'\n  SSIM: {}",
                 path1.display(),

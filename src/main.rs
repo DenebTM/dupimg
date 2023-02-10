@@ -14,7 +14,7 @@ struct Args {
         short,
         long,
         help = "Traverse directories listed in <FILENAMES>
-When this is set, all non-image files will be ignored"
+When this is set, all non-image files will be ignored."
     )]
     recurse: bool,
 
@@ -40,7 +40,7 @@ fn main() {
             for entry in entries_iter {
                 let entries_b = entries.clone();
                 pool.execute(move || {
-                    compare_imgs(&entry, &entries_b, args.threshold)
+                    compare_imgs(&entry, &entries_b, args.threshold.unwrap_or(0.1))
                         .unwrap_or_else(|err| println!("Error while processing images: {:?}", err))
                 });
             }
