@@ -134,6 +134,7 @@ dependencies = [
  "image",
  "imgref",
  "lazy_static",
+ "rgb",
 ]
 
 [[package]]

@@ -3,6 +3,7 @@ use std::path::PathBuf;
 use dssim_core::{Dssim, DssimImage};
 use image::{imageops::FilterType, ImageError};
 use imgref::Img;
+use rgb::RGB;
 
 use crate::cache::{PathPair, ALREADY_CHECKED_CACHE, SCALED_IMG_CACHE};
 
@@ -57,20 +58,33 @@ fn dssim_from_path(path: &PathBuf, dssim: &Dssim) -> Result<DssimImage<f32>, Ima
 
     let mut cache = SCALED_IMG_CACHE.lock().unwrap();
     if !cache.contains_key(path) {
+        // release mutex on cache so as not to block other threads
         drop(cache);
+
         let img = ImageReader::open(path)?
             .decode()?
             .resize_exact(SCALED_SIZE, SCALED_SIZE, FilterType::Nearest)
             .into_rgb32f();
 
+        // convert image::Rgb to rgb::RGB (why)
+        let pixels: Vec<RGB<f32>> = img
+            .pixels()
+            .map(|p| RGB {
+                r: p.0[0],
+                g: p.0[1],
+                b: p.0[2],
+            })
+            .collect();
+
         // Dssim/imgref wrapper struct for the second image to be compared
-        let b = Img::new(
-            img.as_raw().to_owned(),
+        let src_img = Img::new(
+            pixels,
             SCALED_SIZE.try_into().unwrap(),
             SCALED_SIZE.try_into().unwrap(),
         );
+
         cache = SCALED_IMG_CACHE.lock().unwrap();
-        cache.insert(path.to_owned(), dssim.create_image(&b).unwrap());
+        cache.insert(path.to_owned(), dssim.create_image(&src_img).unwrap());
     }
 
     return Ok(cache.get(path).unwrap().to_owned());
