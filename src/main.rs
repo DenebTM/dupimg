@@ -1,6 +1,6 @@
 use threadpool::ThreadPool;
 
-use crate::compare::compare_img;
+use crate::compare::compare_imgs;
 use std::{env, path::PathBuf};
 
 mod cache;
@@ -46,7 +46,7 @@ fn main() {
             for entry in entries_iter {
                 let entries_b = entries.clone();
                 pool.execute(move || {
-                    compare_img(&entry, &entries_b)
+                    compare_imgs(&entry, &entries_b)
                         .unwrap_or_else(|err| println!("Error while processing images: {:?}", err))
                 });
             }

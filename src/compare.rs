@@ -5,52 +5,56 @@ use image::{imageops::FilterType, ImageError};
 use imgref::Img;
 use rgb::RGB;
 
-use crate::cache::{PathPair, ALREADY_CHECKED_CACHE, SCALED_IMG_CACHE};
+use crate::cache::{ALREADY_CHECKED_CACHE, SCALED_IMG_CACHE};
 
 static SCALED_SIZE: u32 = 200;
 
-pub fn compare_img(img_path: &PathBuf, other: &Vec<PathBuf>) -> Result<(), ImageError> {
+pub fn compare_imgs(img_path: &PathBuf, other: &Vec<PathBuf>) -> Result<(), ImageError> {
     if other.len() == 0 {
         return Ok(());
     }
 
     let d = Dssim::new();
-    let img_a = dssim_from_path(img_path, &d).unwrap();
+    let img1 = dssim_from_path(img_path, &d).unwrap();
+    return other
+        .iter()
+        .map(|other_path| compare_img(&img_path, &other_path, &img1, &d))
+        .collect();
+}
 
-    for other_path in other.iter() {
-        if other_path == img_path {
-            continue;
-        }
-
-        // check if the combination of img_path/other_path or other_path/img_path has already been checked
-        let mut comp_cache = ALREADY_CHECKED_CACHE.lock().unwrap();
-        if comp_cache.contains(&PathPair {
-            0: img_path.to_owned(),
-            1: other_path.to_owned(),
-        }) || comp_cache.contains(&PathPair {
-            0: other_path.to_owned(),
-            1: img_path.to_owned(),
-        }) {
-            continue;
-        }
-        comp_cache.insert(PathPair {
-            0: img_path.to_owned(),
-            1: other_path.to_owned(),
-        });
-        drop(comp_cache);
-
-        let img_b = dssim_from_path(other_path, &d)?;
-
-        let (diff, _) = d.compare(&img_a, &img_b);
+fn compare_img(
+    path1: &PathBuf,
+    path2: &PathBuf,
+    img1: &DssimImage<f32>,
+    dssim: &Dssim,
+) -> Result<(), ImageError> {
+    if !already_checked(path1.to_owned(), path2.to_owned()) {
+        let img2 = dssim_from_path(path2, &dssim)?;
+        let (diff, _) = dssim.compare(img1, &img2);
         println!(
             "\n'{}'\n'{}'\n  SSIM: {}",
-            img_path.display(),
-            other_path.display(),
+            path1.display(),
+            path2.display(),
             diff
         );
     }
 
     Ok(())
+}
+
+fn already_checked(path1: PathBuf, path2: PathBuf) -> bool {
+    if path1 == path2 {
+        return true;
+    }
+
+    let mut comp_cache = ALREADY_CHECKED_CACHE.lock().unwrap();
+    if comp_cache.contains(&(path1.to_owned(), path2.to_owned()))
+        || comp_cache.contains(&(path2.to_owned(), path1.to_owned()))
+    {
+        return true;
+    }
+    comp_cache.insert((path1.to_owned(), path2.to_owned()));
+    false
 }
 
 fn dssim_from_path(path: &PathBuf, dssim: &Dssim) -> Result<DssimImage<f32>, ImageError> {
