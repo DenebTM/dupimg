@@ -134,7 +134,9 @@ dependencies = [
  "image",
  "imgref",
  "lazy_static",
+ "num_cpus",
  "rgb",
+ "threadpool",
 ]
 
 [[package]]

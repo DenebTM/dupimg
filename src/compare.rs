@@ -39,7 +39,7 @@ pub fn compare_img(img_path: &PathBuf, other: &Vec<PathBuf>) -> Result<(), Image
         });
         drop(comp_cache);
 
-        let img_b = dssim_from_path(other_path, &d).unwrap();
+        let img_b = dssim_from_path(other_path, &d)?;
 
         let (diff, _) = d.compare(&img_a, &img_b);
         println!(
