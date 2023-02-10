@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use dssim_core::{Dssim, DssimImage};
-use image::{imageops::FilterType, ImageError};
+use image::imageops::FilterType;
 use imgref::Img;
 use rgb::RGB;
 
@@ -13,13 +13,13 @@ pub fn compare_imgs(
     img_path: &PathBuf,
     other: &Vec<PathBuf>,
     threshold: f64,
-) -> Result<(), ImageError> {
+) -> Result<(), String> {
     if other.len() == 0 {
         return Ok(());
     }
 
     let d = Dssim::new();
-    let img1 = dssim_from_path(img_path, &d).unwrap();
+    let img1 = dssim_from_path(img_path, &d)?;
     return other
         .iter()
         .map(|other_path| compare_img(&img_path, &other_path, &img1, &d, threshold))
@@ -32,7 +32,7 @@ fn compare_img(
     img1: &DssimImage<f32>,
     dssim: &Dssim,
     threshold: f64,
-) -> Result<(), ImageError> {
+) -> Result<(), String> {
     if !already_checked(path1.to_owned(), path2.to_owned()) {
         let img2 = dssim_from_path(path2, &dssim)?;
         let (diff, _) = dssim.compare(img1, &img2);
@@ -64,16 +64,18 @@ fn already_checked(path1: PathBuf, path2: PathBuf) -> bool {
     false
 }
 
-fn dssim_from_path(path: &PathBuf, dssim: &Dssim) -> Result<DssimImage<f32>, ImageError> {
+fn dssim_from_path(path: &PathBuf, dssim: &Dssim) -> Result<DssimImage<f32>, String> {
     use image::io::Reader as ImageReader;
 
     let mut cache = SCALED_IMG_CACHE.lock().unwrap();
-    if !cache.contains_key(path) {
+    return if !cache.contains_key(path) {
         // release mutex on cache so as not to block other threads
         drop(cache);
 
-        let img = ImageReader::open(path)?
-            .decode()?
+        let img = ImageReader::open(path)
+            .map_err(|err| format!("Error while reading '{}': {}", path.display(), err))?
+            .decode()
+            .map_err(|err| format!("Error while decoding '{}': {}", path.display(), err))?
             .resize_exact(SCALED_SIZE, SCALED_SIZE, FilterType::Nearest)
             .into_rgb32f();
 
@@ -95,8 +97,17 @@ fn dssim_from_path(path: &PathBuf, dssim: &Dssim) -> Result<DssimImage<f32>, Ima
         );
 
         cache = SCALED_IMG_CACHE.lock().unwrap();
-        cache.insert(path.to_owned(), dssim.create_image(&src_img).unwrap());
-    }
-
-    return Ok(cache.get(path).unwrap().to_owned());
+        match dssim.create_image(&src_img) {
+            Some(img) => {
+                cache.insert(path.to_owned(), img);
+                Ok(cache.get(path).unwrap().to_owned())
+            }
+            None => Err(format!(
+                "dssim.create_image returned None for {}",
+                path.display()
+            )),
+        }
+    } else {
+        Ok(cache.get(path).unwrap().to_owned())
+    };
 }

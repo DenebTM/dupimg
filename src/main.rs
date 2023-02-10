@@ -41,7 +41,7 @@ fn main() {
                 let entries_b = entries.clone();
                 pool.execute(move || {
                     compare_imgs(&entry, &entries_b, args.threshold.unwrap_or(0.1))
-                        .unwrap_or_else(|err| println!("Error while processing images: {:?}", err))
+                        .unwrap_or_else(|err| eprintln!("{err}"))
                 });
             }
 
