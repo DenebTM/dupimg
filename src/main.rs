@@ -81,13 +81,14 @@ fn gather_files(filenames: &Vec<PathBuf>, recurse: bool) -> Result<Vec<PathBuf>,
             Some(ext) => ext.to_str().unwrap_or(""),
         };
         match ext.to_lowercase().as_str() {
-            "jpg" | "png" | "jpeg" | "jfif" => Ok([files, vec![path.to_owned()]].concat()),
+            "jpg" | "png" | "jpeg" | "jfif" | "gif" | "bmp" | "ico" | "tiff" | "webp" | "avif"
+            | "pbm" | "pgm" | "ppm" | "tga" => Ok([files, vec![path.to_owned()]].concat()),
             _ => {
                 if recurse {
                     Ok(files)
                 } else {
                     Err(format!(
-                        "Invalid argument: '{}'\n  Only PNG and JPEG files are supported",
+                        "Invalid argument: '{}'\n  Unsupported format or not an image",
                         path.display()
                     ))
                 }
