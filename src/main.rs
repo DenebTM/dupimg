@@ -34,7 +34,7 @@ fn main() {
 
     match gather_files(&args.filenames, args.recurse) {
         Ok(entries) => {
-            let pool = ThreadPool::new(num_cpus::get() * 4);
+            let pool = ThreadPool::new(num_cpus::get() * 2);
 
             let entries_iter = entries.clone();
             for entry in entries_iter {

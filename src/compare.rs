@@ -7,7 +7,7 @@ use rgb::RGB;
 
 use crate::cache::{ALREADY_CHECKED_CACHE, SCALED_IMG_CACHE};
 
-static SCALED_SIZE: u32 = 200;
+static SCALED_SIZE: u32 = 100;
 
 pub fn compare_imgs(
     img_path: &PathBuf,
@@ -83,6 +83,7 @@ fn dssim_from_path(path: &PathBuf, dssim: &Dssim) -> Result<DssimImage<f32>, Str
         .map_err(|err| format!("Error while reading '{}': {}", path.display(), err))?
         .decode()
         .map_err(|err| format!("Error while decoding '{}': {}", path.display(), err))?
+        .adjust_contrast(30.0)
         .resize_exact(SCALED_SIZE, SCALED_SIZE, FilterType::Nearest)
         .into_rgb32f();
 
