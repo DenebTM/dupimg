@@ -217,8 +217,8 @@ dependencies = [
  "lazy_static",
  "moka",
  "num_cpus",
+ "rayon",
  "rgb",
- "threadpool",
 ]
 
 [[package]]

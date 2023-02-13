@@ -3,6 +3,7 @@ use std::{path::PathBuf, sync::Arc};
 use dssim_core::{Dssim, DssimImage};
 use image::imageops::FilterType;
 use imgref::Img;
+use rayon::prelude::{IntoParallelIterator, ParallelIterator};
 use rgb::RGB;
 
 use crate::cache::{ALREADY_CHECKED_CACHE, SCALED_IMG_CACHE};
@@ -13,18 +14,18 @@ pub fn compare_imgs(
     img_path: &PathBuf,
     other: &Vec<PathBuf>,
     threshold: f64,
+    dssim: &Dssim,
 ) -> Result<(), Arc<String>> {
     if other.len() == 0 {
         return Ok(());
     }
 
-    let dssim = Dssim::new();
-    let img1 = get_cached_img(img_path, &dssim, other)?;
+    let img1 = get_cached_img(img_path, &dssim, other, false)?;
     other
         .iter()
         .map(|other_path| {
             if !already_checked(img_path.to_owned(), other_path.to_owned()) {
-                let img2 = get_cached_img(other_path, &dssim, other)?;
+                let img2 = get_cached_img(other_path, &dssim, other, false)?;
 
                 let (diff, _) = dssim.compare(&img1, img2);
                 if diff <= threshold {
@@ -58,18 +59,35 @@ fn already_checked(path1: PathBuf, path2: PathBuf) -> bool {
     };
 }
 
+pub fn prescale<'a>(paths: &'a Vec<PathBuf>, dssim: &'a Dssim) -> Vec<&'a PathBuf> {
+    paths
+        .into_par_iter()
+        .map(|path| match get_cached_img(path, dssim, &paths, true) {
+            Ok(_) => None,
+            Err(err) => {
+                eprintln!("{err}");
+                Some(path)
+            }
+        })
+        .flatten()
+        .collect()
+}
+
 fn get_cached_img(
     path: &PathBuf,
     dssim: &Dssim,
     other: &Vec<PathBuf>,
+    precache: bool,
 ) -> Result<Arc<DssimImage<f32>>, Arc<String>> {
     SCALED_IMG_CACHE.try_get_with(path.to_owned(), || match dssim_from_path(path, dssim) {
         Ok(img) => Ok(Arc::new(img)),
         Err(err) => {
             // mark this image as "already checked" to prevent a million errors
-            let mut comp_cache = ALREADY_CHECKED_CACHE.lock().unwrap();
-            for other_path in other {
-                comp_cache.insert((path.to_owned(), other_path.to_owned()));
+            if !precache {
+                let mut comp_cache = ALREADY_CHECKED_CACHE.lock().unwrap();
+                for other_path in other {
+                    comp_cache.insert((path.to_owned(), other_path.to_owned()));
+                }
             }
             Err(err)
         }
