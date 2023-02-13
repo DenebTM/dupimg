@@ -18,36 +18,28 @@ pub fn compare_imgs(
         return Ok(());
     }
 
-    let d = Dssim::new();
-    let img1 = get_cached_img(img_path, &d)?;
-    return other
+    let dssim = Dssim::new();
+    let img1 = get_cached_img(img_path, &dssim, other)?;
+    other
         .iter()
-        .map(|other_path| compare_img(&img_path, &other_path, &img1, &d, threshold))
-        .collect();
-}
+        .map(|other_path| {
+            if !already_checked(img_path.to_owned(), other_path.to_owned()) {
+                let img2 = get_cached_img(other_path, &dssim, other)?;
 
-fn compare_img(
-    path1: &PathBuf,
-    path2: &PathBuf,
-    img1: &DssimImage<f32>,
-    dssim: &Dssim,
-    threshold: f64,
-) -> Result<(), Arc<String>> {
-    if !already_checked(path1.to_owned(), path2.to_owned()) {
-        let img2 = get_cached_img(path2, &dssim)?;
+                let (diff, _) = dssim.compare(&img1, img2);
+                if diff <= threshold {
+                    println!(
+                        "\n'{}'\n'{}'\n  SSIM: {}",
+                        img_path.display(),
+                        other_path.display(),
+                        diff
+                    );
+                }
+            }
 
-        let (diff, _) = dssim.compare(img1, img2);
-        if diff <= threshold {
-            println!(
-                "\n'{}'\n'{}'\n  SSIM: {}",
-                path1.display(),
-                path2.display(),
-                diff
-            );
-        }
-    }
-
-    Ok(())
+            Ok(())
+        })
+        .collect()
 }
 
 fn already_checked(path1: PathBuf, path2: PathBuf) -> bool {
@@ -56,19 +48,31 @@ fn already_checked(path1: PathBuf, path2: PathBuf) -> bool {
     }
 
     let mut comp_cache = ALREADY_CHECKED_CACHE.lock().unwrap();
-    if comp_cache.contains(&(path1.to_owned(), path2.to_owned()))
-        || comp_cache.contains(&(path2.to_owned(), path1.to_owned()))
+    return if comp_cache.contains(&(path1.clone(), path2.clone()))
+        || comp_cache.contains(&(path2.clone(), path1.clone()))
     {
-        return true;
-    }
-    comp_cache.insert((path1.to_owned(), path2.to_owned()));
-    false
+        true
+    } else {
+        comp_cache.insert((path1, path2));
+        false
+    };
 }
 
-fn get_cached_img(path: &PathBuf, dssim: &Dssim) -> Result<Arc<DssimImage<f32>>, Arc<String>> {
+fn get_cached_img(
+    path: &PathBuf,
+    dssim: &Dssim,
+    other: &Vec<PathBuf>,
+) -> Result<Arc<DssimImage<f32>>, Arc<String>> {
     SCALED_IMG_CACHE.try_get_with(path.to_owned(), || match dssim_from_path(path, dssim) {
         Ok(img) => Ok(Arc::new(img)),
-        Err(err) => Err(err), // insert stuff into already_checked_cache
+        Err(err) => {
+            // mark this image as "already checked" to prevent a million errors
+            let mut comp_cache = ALREADY_CHECKED_CACHE.lock().unwrap();
+            for other_path in other {
+                comp_cache.insert((path.to_owned(), other_path.to_owned()));
+            }
+            Err(err)
+        }
     })
 }
 
