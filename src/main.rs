@@ -40,6 +40,14 @@ When this is set, all non-image files will be ignored."
 This may lead to a more unpredictable runtime."
     )]
     no_prescale: bool,
+
+    #[arg(
+        short = 'j',
+        long = "max-threads",
+        help = "Maximum number of worker threads to start
+Defaults to $(nproc) * 2"
+    )]
+    max_threads: Option<usize>,
 }
 
 fn main() {
@@ -50,7 +58,7 @@ fn main() {
             let dssim = Dssim::new();
 
             ThreadPoolBuilder::new()
-                .num_threads(num_cpus::get() * 2)
+                .num_threads(args.max_threads.unwrap_or(num_cpus::get() * 2))
                 .build_global()
                 .unwrap();
             if !args.no_prescale {

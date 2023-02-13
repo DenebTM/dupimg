@@ -47,6 +47,8 @@ positives.
 When recurse is enabled, only PNG and JPG files will be checked. This also
 applies to filenames specified on the command line.
 
+For additional information, see `dupimg --help`.
+
 ### Note
 
 All program output is unsorted and unstable, do not rely on it.
