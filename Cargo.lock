@@ -219,6 +219,7 @@ dependencies = [
  "num_cpus",
  "rayon",
  "rgb",
+ "walkdir",
 ]
 
 [[package]]

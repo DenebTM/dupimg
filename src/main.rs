@@ -5,6 +5,7 @@ use rayon::{
     prelude::{IntoParallelIterator, ParallelIterator},
     ThreadPoolBuilder,
 };
+use walkdir::WalkDir;
 
 use crate::compare::compare_imgs;
 use std::path::PathBuf;
@@ -80,48 +81,57 @@ fn main() {
     }
 }
 
-// ik this is overengineered leave me alone
-fn gather_files(filenames: &Vec<PathBuf>, recurse: bool) -> Result<Vec<PathBuf>, String> {
-    filenames.iter().try_fold(vec![], |files, path| {
-        if path.is_dir() {
-            return if recurse {
-                match &path
-                    .read_dir()
-                    .map_err(|err| format!("I/O Error in '{}': {}", path.display(), err))?
-                    .map(|subentry| match subentry {
-                        Ok(de) => Ok(de.path()),
-                        Err(err) => Err(format!("I/O Error in '{}': {}", path.display(), err)),
-                    })
-                    .collect()
-                {
-                    Ok(col) => Ok([files, gather_files(col, recurse)?].concat()),
-                    Err(err) => Err(err.to_owned()),
-                }
-            } else {
-                Err(format!(
-                    "Invalid argument: '{}'\n  Will not traverse directories without --recurse",
-                    path.display()
-                ))
-            };
-        }
+fn is_allowed_ext(filename: &PathBuf) -> bool {
+    let allowed = [
+        "jpg", "jpeg", "jfif", "png", "gif", "bmp", "ico", "tiff", "webp", "avif", "pbm", "pgm",
+        "ppm", "tga",
+    ];
+    let ext = match filename.extension() {
+        None => "",
+        Some(ext) => ext.to_str().unwrap_or(""),
+    };
 
-        let ext = match path.extension() {
-            None => "",
-            Some(ext) => ext.to_str().unwrap_or(""),
-        };
-        match ext.to_lowercase().as_str() {
-            "jpg" | "png" | "jpeg" | "jfif" | "gif" | "bmp" | "ico" | "tiff" | "webp" | "avif"
-            | "pbm" | "pgm" | "ppm" | "tga" => Ok([files, vec![path.to_owned()]].concat()),
-            _ => {
-                if recurse {
-                    Ok(files)
-                } else {
-                    Err(format!(
-                        "Invalid argument: '{}'\n  Unsupported format or not an image",
-                        path.display()
-                    ))
-                }
+    allowed.contains(&ext.to_lowercase().as_str())
+}
+
+fn gather_files(paths: &Vec<PathBuf>, recurse: bool) -> Result<Vec<PathBuf>, String> {
+    let mut files: Box<dyn Iterator<Item = PathBuf>> = Box::new(
+        paths
+            .iter()
+            .filter(|f| {
+                f.is_file()
+                    || !recurse && {
+                        eprintln!("Ignoring '{}': --recurse not set", f.display());
+                        false
+                    }
+            })
+            .map(|e| e.to_owned()),
+    );
+
+    if recurse {
+        let dirs = paths
+            .iter()
+            .filter(|f| f.is_dir())
+            .map(|f| {
+                WalkDir::new(f)
+                    .follow_links(true)
+                    .into_iter()
+                    .filter_map(|e| e.ok())
+                    .map(|e| e.path().to_owned())
+                    .filter(|e| e.is_file())
+            })
+            .flatten();
+
+        files = Box::new(files.chain(dirs));
+    }
+
+    Ok(files
+        .into_iter()
+        .filter(|f| {
+            is_allowed_ext(f) || {
+                eprintln!("Ignoring '{}': Unsupported file format", f.display());
+                false
             }
-        }
-    })
+        })
+        .collect())
 }
