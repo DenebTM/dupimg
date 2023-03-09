@@ -98,9 +98,9 @@ fn dssim_from_path(path: &PathBuf, dssim: &Dssim) -> Result<DssimImage<f32>, Str
     use image::io::Reader as ImageReader;
 
     let img = ImageReader::open(path)
-        .map_err(|err| format!("Error while reading '{}': {}", path.display(), err))?
+        .map_err(|err| format!("Could not read '{}' - {err}", path.display()))?
         .decode()
-        .map_err(|err| format!("Error while decoding '{}': {}", path.display(), err))?
+        .map_err(|err| format!("Could not process '{}' - {err}", path.display()))?
         .adjust_contrast(30.0)
         .resize_exact(SCALED_SIZE, SCALED_SIZE, FilterType::Nearest)
         .into_rgb32f();
@@ -116,11 +116,7 @@ fn dssim_from_path(path: &PathBuf, dssim: &Dssim) -> Result<DssimImage<f32>, Str
         .collect();
 
     // Dssim/imgref wrapper struct for the second image to be compared
-    let src_img = Img::new(
-        pixels,
-        SCALED_SIZE.try_into().unwrap(),
-        SCALED_SIZE.try_into().unwrap(),
-    );
+    let src_img = Img::new(pixels, SCALED_SIZE as usize, SCALED_SIZE as usize);
 
     match dssim.create_image(&src_img) {
         Some(img) => Ok(img),
