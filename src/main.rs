@@ -1,3 +1,4 @@
+use args::Args;
 use clap::Parser;
 use compare::prescale;
 use dssim_core::Dssim;
@@ -10,46 +11,9 @@ use walkdir::WalkDir;
 use crate::compare::compare_imgs;
 use std::path::PathBuf;
 
+mod args;
 mod cache;
 mod compare;
-
-#[derive(Parser, Debug)]
-#[command(author, version, about, long_about = None)]
-struct Args {
-    #[arg(
-        short,
-        long,
-        help = "Traverse directories listed in <FILENAMES>
-When this is set, all non-image files will be ignored."
-    )]
-    recurse: bool,
-
-    #[arg(
-        short,
-        long,
-        help = "Only show results with a similarity score <= <THRESHOLD>"
-    )]
-    threshold: Option<f64>,
-
-    #[arg(help = "Files (and/or directories: -r) to check", required(true))]
-    filenames: Vec<PathBuf>,
-
-    #[arg(
-        short,
-        long,
-        help = "Scale images on the first comparison instead of at the start
-This may lead to a more unpredictable runtime."
-    )]
-    no_prescale: bool,
-
-    #[arg(
-        short = 'j',
-        long = "max-threads",
-        help = "Maximum number of worker threads to start
-Defaults to $(nproc) * 2"
-    )]
-    max_threads: Option<usize>,
-}
 
 fn main() {
     let args = Args::parse();
@@ -94,9 +58,9 @@ fn is_allowed_ext(filename: &PathBuf) -> bool {
     allowed.contains(&ext.to_lowercase().as_str())
 }
 
-fn gather_files(paths: &Vec<PathBuf>, recurse: bool) -> Result<Vec<PathBuf>, String> {
+fn gather_files(filenames: &Vec<PathBuf>, recurse: bool) -> Result<Vec<PathBuf>, String> {
     let mut files: Box<dyn Iterator<Item = PathBuf>> = Box::new(
-        paths
+        filenames
             .iter()
             .filter(|f| {
                 f.is_file()
@@ -109,7 +73,7 @@ fn gather_files(paths: &Vec<PathBuf>, recurse: bool) -> Result<Vec<PathBuf>, Str
     );
 
     if recurse {
-        let dirs = paths
+        let dirs = filenames
             .iter()
             .filter(|f| f.is_dir())
             .map(|f| {
