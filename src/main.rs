@@ -58,7 +58,7 @@ fn is_allowed_ext(filename: &PathBuf) -> bool {
     allowed.contains(&ext.to_lowercase().as_str())
 }
 
-fn gather_files(filenames: &Vec<PathBuf>, recurse: bool) -> Result<Vec<PathBuf>, String> {
+fn gather_files(filenames: &Vec<PathBuf>, recurse: bool) -> Result<Vec<PathBuf>, &str> {
     let mut files: Box<dyn Iterator<Item = PathBuf>> = Box::new(
         filenames
             .iter()
@@ -89,7 +89,7 @@ fn gather_files(filenames: &Vec<PathBuf>, recurse: bool) -> Result<Vec<PathBuf>,
         files = Box::new(files.chain(dirs));
     }
 
-    Ok(files
+    let final_list: Vec<_> = files
         .into_iter()
         .filter(|f| {
             is_allowed_ext(f) || {
@@ -97,5 +97,10 @@ fn gather_files(filenames: &Vec<PathBuf>, recurse: bool) -> Result<Vec<PathBuf>,
                 false
             }
         })
-        .collect())
+        .collect();
+
+    match final_list.len() {
+        0 => Err("No files to process"),
+        _ => Ok(final_list),
+    }
 }
