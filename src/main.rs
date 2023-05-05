@@ -23,7 +23,7 @@ fn main() {
             let dssim = Dssim::new();
 
             ThreadPoolBuilder::new()
-                .num_threads(args.max_threads.unwrap_or(num_cpus::get() * 2))
+                .num_threads(args.max_threads.unwrap_or(num_cpus::get()))
                 .build_global()
                 .unwrap();
             if !args.no_prescale {
@@ -37,7 +37,7 @@ fn main() {
             }
 
             entries.clone().into_par_iter().for_each(move |entry| {
-                compare_imgs(&entry, &entries, args.threshold.unwrap_or(0.1), &dssim)
+                compare_imgs(&entry, &entries, args.threshold.unwrap(), &dssim)
                     .unwrap_or_else(|err| eprintln!("{err}"))
             });
         }

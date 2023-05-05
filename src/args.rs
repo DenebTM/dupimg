@@ -15,7 +15,8 @@ pub struct Args {
     #[arg(
         short,
         long,
-        help = "Only show results with a similarity score <= <THRESHOLD>"
+        default_value = "0.1",
+        help = "Only show results with a similarity score <= <THRESHOLD>\n"
     )]
     pub threshold: Option<f64>,
 
@@ -33,8 +34,7 @@ pub struct Args {
     #[arg(
         short = 'j',
         long = "max-threads",
-        help = "Maximum number of worker threads to start\n\
-                Defaults to $(nproc) * 2"
+        help = "Maximum number of worker threads to start\n [default: $(nproc)]"
     )]
     pub max_threads: Option<usize>,
 }
