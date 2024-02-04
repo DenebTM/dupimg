@@ -36,10 +36,19 @@ fn main() {
                 println!("Done.");
             }
 
-            entries.clone().into_par_iter().for_each(move |entry| {
-                compare_imgs(&entry, &entries, args.threshold.unwrap(), &dssim)
-                    .unwrap_or_else(|err| eprintln!("{err}"))
-            });
+            if args.left_filenames.len() > 0 {
+                if let Ok(left_entries) = gather_files(&args.left_filenames, args.recurse) {
+                    left_entries.into_par_iter().for_each(move |left_entry| {
+                        compare_imgs(&left_entry, &entries, args.threshold.unwrap(), &dssim)
+                            .unwrap_or_else(|err| eprintln!("{err}"))
+                    });
+                }
+            } else {
+                entries.clone().into_par_iter().for_each(move |entry| {
+                    compare_imgs(&entry, &entries, args.threshold.unwrap(), &dssim)
+                        .unwrap_or_else(|err| eprintln!("{err}"))
+                });
+            }
         }
         Err(err) => eprintln!("{err}"),
     }

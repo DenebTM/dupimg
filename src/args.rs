@@ -20,8 +20,22 @@ pub struct Args {
     )]
     pub threshold: Option<f64>,
 
-    #[arg(help = "Files (and/or directories: -r) to check", required(true))]
+    #[arg(
+        help = "[Right: see --lhs] Files (and/or directories: -r) to check",
+        required(true)
+    )]
     pub filenames: Vec<PathBuf>,
+
+    #[arg(
+        short = 'l',
+        long = "lhs",
+        help = "Left files (and/or directories: -r) to check (lhs)\n\
+                When specified, each image listed under <LEFT_FILENAMES> will be checked\n\
+                against each image listed under <FILENAMES>.\n\
+                Must be specified for each file or directory individually.\n \
+                 e.g. -l <file1> -r -l <dir2>"
+    )]
+    pub left_filenames: Vec<PathBuf>,
 
     #[arg(
         short,
