@@ -8,7 +8,7 @@ pub struct Args {
         short,
         long,
         help = "Traverse directories listed in <FILENAMES>\n\
-                When this is set, all non-image files will be ignored."
+                When specified, all non-image files will be ignored."
     )]
     pub recurse: bool,
 
@@ -40,7 +40,8 @@ pub struct Args {
     #[arg(
         short,
         long,
-        help = "Scale images on the first comparison instead of at the start\n\
+        help = "Scale each image when it is first compared, instead of scaling all images\n\
+                before performing the first comparison.\n\
                 This may lead to a more unpredictable runtime."
     )]
     pub no_prescale: bool,

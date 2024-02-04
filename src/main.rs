@@ -27,13 +27,13 @@ fn main() {
                 .build_global()
                 .unwrap();
             if !args.no_prescale {
-                println!("Prescaling images, please stand by...");
+                eprintln!("Prescaling images, please stand by...");
                 for err_path in prescale(&entries.clone(), &dssim) {
                     if let Some(index) = entries.iter().position(|e| e == err_path) {
                         entries.remove(index);
                     }
                 }
-                println!("Done.");
+                eprintln!("Done.");
             }
 
             if args.left_filenames.len() > 0 {
