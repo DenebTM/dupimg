@@ -56,7 +56,7 @@ fn already_checked(path1: PathBuf, path2: PathBuf) -> bool {
     };
 }
 
-pub fn prescale<'a>(paths: &'a Vec<PathBuf>, hasher: &'a Hasher) -> Vec<&'a PathBuf> {
+pub fn hash_paths<'a>(paths: &'a Vec<PathBuf>, hasher: &'a Hasher) -> Vec<&'a PathBuf> {
     paths
         .into_par_iter()
         .map(|path| match get_cached_hash(path, hasher, &paths, true) {

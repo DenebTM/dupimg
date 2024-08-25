@@ -5,22 +5,6 @@ use std::path::PathBuf;
 #[command(author, version, about, long_about = None)]
 pub struct Args {
     #[arg(
-        short,
-        long,
-        help = "Traverse directories listed in <FILENAMES>\n\
-                When specified, all non-image files will be ignored."
-    )]
-    pub recurse: bool,
-
-    #[arg(
-        short,
-        long,
-        default_value = "5",
-        help = "Only show results with a similarity score <= <THRESHOLD>\n"
-    )]
-    pub threshold: Option<u32>,
-
-    #[arg(
         help = "[Right: see --lhs] Files (and/or directories: -r) to check",
         required(true)
     )]
@@ -40,11 +24,28 @@ pub struct Args {
     #[arg(
         short,
         long,
-        help = "Scale each image when it is first compared, instead of scaling all images\n\
-                before performing the first comparison.\n\
-                This may lead to a more unpredictable runtime."
+        help = "Traverse directories listed in <FILENAMES>\n\
+                When specified, all non-image files will be ignored."
     )]
-    pub no_prescale: bool,
+    pub recurse: bool,
+
+    #[arg(
+        short,
+        long,
+        default_value = "5",
+        help = "Duplicate detection threshold\n\
+                Only show results with hash distance <= <THRESHOLD>\n"
+    )]
+    pub threshold: u32,
+
+    #[arg(
+        short,
+        long = "s",
+        default_value = "8",
+        help = "Image hash size in bytes. Larger hashes are slower, but may allow for more precise \
+                comparisons. Duplicate detection threshold may need to be increased alongside this."
+    )]
+    pub hash_size: u32,
 
     #[arg(
         short = 'j',

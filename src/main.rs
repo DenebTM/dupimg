@@ -1,6 +1,6 @@
 use args::Args;
 use clap::Parser;
-use compare::prescale;
+use compare::hash_paths;
 use image_hasher::HasherConfig;
 use rayon::{
     prelude::{IntoParallelIterator, ParallelIterator},
@@ -9,13 +9,14 @@ use rayon::{
 use walkdir::WalkDir;
 
 use crate::compare::compare_imgs;
-use std::path::PathBuf;
+use std::{
+    io::{stdout, Write},
+    path::PathBuf,
+};
 
 mod args;
 mod cache;
 mod compare;
-
-static HASH_SIZE: u32 = 32;
 
 fn main() {
     let args = Args::parse();
@@ -23,33 +24,33 @@ fn main() {
     match gather_files(&args.filenames, args.recurse) {
         Ok(mut entries) => {
             let hasher = HasherConfig::new()
-                .hash_size(HASH_SIZE, HASH_SIZE)
+                .hash_size(args.hash_size, args.hash_size)
                 .to_hasher();
 
             ThreadPoolBuilder::new()
                 .num_threads(args.max_threads.unwrap_or(num_cpus::get()))
                 .build_global()
                 .unwrap();
-            if !args.no_prescale {
-                eprintln!("Calculating hashes...");
-                for err_path in prescale(&entries.clone(), &hasher) {
-                    if let Some(index) = entries.iter().position(|e| e == err_path) {
-                        entries.remove(index);
-                    }
+
+            eprint!("Calculating hashes... ");
+            stdout().flush().unwrap();
+            for err_path in hash_paths(&entries.clone(), &hasher) {
+                if let Some(index) = entries.iter().position(|e| e == err_path) {
+                    entries.remove(index);
                 }
-                eprintln!("done.");
             }
+            eprintln!("done.");
 
             if args.left_filenames.len() > 0 {
                 if let Ok(left_entries) = gather_files(&args.left_filenames, args.recurse) {
                     left_entries.into_par_iter().for_each(move |left_entry| {
-                        compare_imgs(&left_entry, &entries, args.threshold.unwrap(), &hasher)
+                        compare_imgs(&left_entry, &entries, args.threshold, &hasher)
                             .unwrap_or_else(|err| eprintln!("{err}"))
                     });
                 }
             } else {
                 entries.clone().into_par_iter().for_each(move |entry| {
-                    compare_imgs(&entry, &entries, args.threshold.unwrap(), &hasher)
+                    compare_imgs(&entry, &entries, args.threshold, &hasher)
                         .unwrap_or_else(|err| eprintln!("{err}"))
                 });
             }
@@ -76,11 +77,14 @@ fn gather_files(filenames: &Vec<PathBuf>, recurse: bool) -> Result<Vec<PathBuf>,
         filenames
             .iter()
             .filter(|f| {
-                f.is_file()
+                (f.exists() || {
+                    eprintln!("Ignoring '{}': file not found", f.display());
+                    false
+                }) && (f.is_file()
                     || !recurse && {
                         eprintln!("Ignoring '{}': --recurse not set", f.display());
                         false
-                    }
+                    })
             })
             .map(|e| e.to_owned()),
     );
@@ -106,7 +110,7 @@ fn gather_files(filenames: &Vec<PathBuf>, recurse: bool) -> Result<Vec<PathBuf>,
         .into_iter()
         .filter(|f| {
             is_allowed_ext(f) || {
-                eprintln!("Ignoring '{}': Unsupported file format", f.display());
+                eprintln!("Ignoring '{}': unsupported file format", f.display());
                 false
             }
         })
