@@ -1,7 +1,7 @@
 use args::Args;
 use clap::Parser;
 use compare::prescale;
-use dssim_core::Dssim;
+use image_hasher::HasherConfig;
 use rayon::{
     prelude::{IntoParallelIterator, ParallelIterator},
     ThreadPoolBuilder,
@@ -15,37 +15,41 @@ mod args;
 mod cache;
 mod compare;
 
+static HASH_SIZE: u32 = 32;
+
 fn main() {
     let args = Args::parse();
 
     match gather_files(&args.filenames, args.recurse) {
         Ok(mut entries) => {
-            let dssim = Dssim::new();
+            let hasher = HasherConfig::new()
+                .hash_size(HASH_SIZE, HASH_SIZE)
+                .to_hasher();
 
             ThreadPoolBuilder::new()
                 .num_threads(args.max_threads.unwrap_or(num_cpus::get()))
                 .build_global()
                 .unwrap();
             if !args.no_prescale {
-                eprintln!("Prescaling images, please stand by...");
-                for err_path in prescale(&entries.clone(), &dssim) {
+                eprintln!("Calculating hashes...");
+                for err_path in prescale(&entries.clone(), &hasher) {
                     if let Some(index) = entries.iter().position(|e| e == err_path) {
                         entries.remove(index);
                     }
                 }
-                eprintln!("Done.");
+                eprintln!("done.");
             }
 
             if args.left_filenames.len() > 0 {
                 if let Ok(left_entries) = gather_files(&args.left_filenames, args.recurse) {
                     left_entries.into_par_iter().for_each(move |left_entry| {
-                        compare_imgs(&left_entry, &entries, args.threshold.unwrap(), &dssim)
+                        compare_imgs(&left_entry, &entries, args.threshold.unwrap(), &hasher)
                             .unwrap_or_else(|err| eprintln!("{err}"))
                     });
                 }
             } else {
                 entries.clone().into_par_iter().for_each(move |entry| {
-                    compare_imgs(&entry, &entries, args.threshold.unwrap(), &dssim)
+                    compare_imgs(&entry, &entries, args.threshold.unwrap(), &hasher)
                         .unwrap_or_else(|err| eprintln!("{err}"))
                 });
             }

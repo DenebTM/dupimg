@@ -15,10 +15,10 @@ pub struct Args {
     #[arg(
         short,
         long,
-        default_value = "0.1",
+        default_value = "5",
         help = "Only show results with a similarity score <= <THRESHOLD>\n"
     )]
-    pub threshold: Option<f64>,
+    pub threshold: Option<u32>,
 
     #[arg(
         help = "[Right: see --lhs] Files (and/or directories: -r) to check",
