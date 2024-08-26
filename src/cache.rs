@@ -1,7 +1,6 @@
 use std::{
     collections::HashMap,
     fs::{self, File},
-    io::{LineWriter, Write},
     path::{Path, PathBuf},
     sync::{Arc, Mutex},
 };
@@ -15,21 +14,10 @@ static CACHE_LOCATION: &str = "~/.cache/dupimg";
 
 pub struct HashCache {
     hashes: Arc<Mutex<HashMap<PathBuf, Arc<ImageHash>>>>,
-    csv_writer: Arc<Mutex<csv::Writer<LineWriter<File>>>>,
+    csv_writer: Arc<Mutex<csv::Writer<File>>>,
 }
 
 impl HashCache {
-    fn create_writer(persist_path: &PathBuf) -> Result<csv::Writer<LineWriter<File>>> {
-        let line_writer = LineWriter::new(
-            fs::OpenOptions::new()
-                .write(true)
-                .append(true)
-                .open(persist_path.clone())?,
-        );
-
-        Ok(csv::Writer::from_writer(line_writer))
-    }
-
     pub fn load(size: u32) -> Result<HashCache> {
         let persist_path = Path::new(shellexpand::full(CACHE_LOCATION)?.as_ref())
             .join(format!("hashes_{size}.csv"));
@@ -42,16 +30,25 @@ impl HashCache {
                     let record = result?;
                     let line = record.position().unwrap().line();
 
-                    let hash_base64 = record
-                        .get(1)
-                        .ok_or_else(|| anyhow!("Line {line}: Missing image hash"))?;
-                    let img_hash = ImageHash::<Box<[u8]>>::from_base64(hash_base64)
-                        .map_err(|_| anyhow!("Line {line}: Invalid base64 bytes"))?;
-
                     let path = record.get(0).map(PathBuf::from);
 
-                    let img_hash = Arc::new(img_hash);
-                    path_map.insert(path.unwrap(), img_hash.clone());
+                    // ignore empty lines
+                    if let Some(path) = path {
+                        // ignore nonexistent files
+                        if !path.exists() {
+                            continue;
+                            // TODO: debug log?
+                        }
+
+                        let hash_base64 = record
+                            .get(1)
+                            .ok_or_else(|| anyhow!("Line {line}: Missing image hash"))?;
+                        let img_hash = ImageHash::<Box<[u8]>>::from_base64(hash_base64)
+                            .map_err(|_| anyhow!("Line {line}: Invalid base64 bytes"))?;
+
+                        let img_hash = Arc::new(img_hash);
+                        path_map.insert(path, img_hash.clone());
+                    }
                 }
 
                 Ok(())
@@ -62,9 +59,7 @@ impl HashCache {
                     if io_err.kind() == std::io::ErrorKind::NotFound {
                         fs::create_dir_all(persist_path.parent().unwrap())
                             .context("Failed to create persist directory")?;
-                        File::create(&persist_path)
-                            .and_then(|mut f| f.write(b"path,img_hash\n"))
-                            .context("Failed to create persist file")?;
+                        File::create(&persist_path).context("Failed to create persist file")?;
 
                         return Ok(());
                     }
@@ -74,31 +69,33 @@ impl HashCache {
             })(),
         }?;
 
-        let csv_writer = Self::create_writer(&persist_path)?;
-
-        Ok(HashCache {
+        // commit cache file back to disk with nonexistent path entries removed
+        let _self = HashCache {
             hashes: Arc::new(Mutex::new(path_map)),
-            csv_writer: Arc::new(Mutex::new(csv_writer)),
-        })
+            csv_writer: Arc::new(Mutex::new(csv::Writer::from_path(persist_path)?)),
+        };
+        _self.save_all()?;
+
+        Ok(_self)
     }
 
-    // pub fn save_all(&self) -> Result<()> {
-    //     self.csv_writer
-    //         .lock()
-    //         .unwrap()
-    //         .write_record(&["path", "img_hash"])
-    //         .context("Failed to write to persist file")?;
+    pub fn save_all(&self) -> Result<()> {
+        self.csv_writer
+            .lock()
+            .unwrap()
+            .write_record(&["path", "img_hash"])
+            .context("Failed to write to persist file")?;
 
-    //     for (path, img_hash) in self.path_map.lock().unwrap().iter() {
-    //         self.csv_writer
-    //             .lock()
-    //             .unwrap()
-    //             .write_record(&[path.display().to_string(), img_hash.to_base64()])
-    //             .context("Failed to write to persist file")?;
-    //     }
+        for (path, img_hash) in self.hashes.lock().unwrap().iter() {
+            self.csv_writer
+                .lock()
+                .unwrap()
+                .write_record(&[path.display().to_string(), img_hash.to_base64()])
+                .context("Failed to write to persist file")?;
+        }
 
-    //     Ok(())
-    // }
+        Ok(())
+    }
 
     fn save_record(&self, (path, img_hash): (&PathBuf, &ImageHash)) -> Result<()> {
         self.csv_writer
