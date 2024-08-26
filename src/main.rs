@@ -9,11 +9,10 @@ use rayon::{
     prelude::{IntoParallelIterator, ParallelIterator},
     ThreadPoolBuilder,
 };
+use unique_tuple::UniqueTuple;
 use walkdir::WalkDir;
 
-use crate::compare::compare_all;
 use std::{
-    hash::{DefaultHasher, Hash, Hasher},
     io::{stdout, Write},
     path::PathBuf,
 };
@@ -21,21 +20,7 @@ use std::{
 mod args;
 mod cache;
 mod compare;
-
-#[derive(PartialEq, Eq, Clone, Copy)]
-struct UniqueTuple<T: Hash>(T, T);
-impl<T: Hash> Hash for UniqueTuple<T> {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        let mut s = DefaultHasher::new();
-        self.0.hash(&mut s);
-        let h0 = s.finish();
-        s = DefaultHasher::new();
-        self.1.hash(&mut s);
-        let h1 = s.finish();
-
-        state.write_u64(h0 ^ h1);
-    }
-}
+mod unique_tuple;
 
 fn main() -> Result<()> {
     let args = Args::parse();
@@ -65,17 +50,17 @@ fn main() -> Result<()> {
         let left_entries = gather_files(&args.left_filenames, args.recurse)?;
 
         left_entries.into_par_iter().for_each(move |left_entry| {
-            compare_all(&left_entry, &entries, args.threshold, &hasher, &hash_cache)
+            compare::compare_all(&left_entry, &entries, args.threshold, &hasher, &hash_cache)
                 .unwrap_or_else(|err| eprintln!("{err}"))
         });
     } else {
         let combs: Vec<(&PathBuf, &PathBuf)> = entries
             .iter()
             .tuple_combinations()
-            .map(|(a, b)| UniqueTuple(a, b))
-            .filter(|UniqueTuple(a, b)| a != b)
+            .filter(|(a, b)| a != b)
+            .map(UniqueTuple::from)
             .unique()
-            .map(|UniqueTuple(a, b)| (a, b))
+            .map(UniqueTuple::into)
             .collect();
 
         combs.into_par_iter().for_each(move |(path1, path2)| {
