@@ -15,7 +15,6 @@ use unique_tuple::UniqueTuple;
 use std::{
     collections::HashMap,
     fs,
-    io::{stdout, Write},
     path::PathBuf,
     sync::{Arc, Mutex},
 };
@@ -61,8 +60,7 @@ fn main() -> Result<()> {
         .hash_size(args.hash_size, args.hash_size)
         .to_hasher();
 
-    eprint!("Calculating hashes... ");
-    stdout().flush()?;
+    eprintln!("Calculating hashes... ");
     for err_path in hash_paths(&entries.clone(), &hasher, &mut hash_cache) {
         if let Some(index) = entries.iter().position(|e| e == err_path) {
             entries.remove(index);
@@ -74,7 +72,7 @@ fn main() -> Result<()> {
     let dist_matrix: Arc<Mutex<HashMap<PathBuf, HashMap<PathBuf, u32>>>> =
         Arc::new(Mutex::new(HashMap::new()));
 
-    eprint!("Computing hamming distances... ");
+    eprintln!("Computing hamming distances... ");
     if args.lhs_filenames.len() > 0 {
         let left_entries = gather_files(&args.lhs_filenames, args.recurse)?;
 
