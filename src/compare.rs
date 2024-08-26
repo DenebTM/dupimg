@@ -1,28 +1,29 @@
-use std::{path::PathBuf, sync::Arc};
+use std::path::PathBuf;
 
-use image::DynamicImage;
-use image_hasher::{Hasher, ImageHash};
-use rayon::prelude::{IntoParallelIterator, ParallelIterator};
+use anyhow::Result;
+use image_hasher::Hasher;
+use rayon::{iter::IntoParallelRefIterator, prelude::ParallelIterator};
 
-use crate::cache::{ALREADY_CHECKED_CACHE, HASH_CACHE};
+use crate::cache::{HashCache, ALREADY_CHECKED_CACHE};
 
 pub fn compare_imgs(
     img_path: &PathBuf,
     other: &Vec<PathBuf>,
     threshold: u32,
     hasher: &Hasher,
-) -> Result<(), Arc<String>> {
+    hash_cache: &HashCache,
+) -> Result<()> {
     if other.len() == 0 {
         return Ok(());
     }
 
-    let hash1 = get_cached_hash(img_path, &hasher, other, false)?;
+    let hash1 = hash_cache.try_get(&img_path, hasher)?;
 
     other
         .iter()
         .map(|other_path| {
             if !already_checked(img_path.to_owned(), other_path.to_owned()) {
-                let hash2 = get_cached_hash(other_path, &hasher, other, false)?;
+                let hash2 = hash_cache.try_get(other_path, hasher)?;
 
                 let dist = hash1.dist(&hash2);
                 if dist <= threshold {
@@ -56,10 +57,14 @@ fn already_checked(path1: PathBuf, path2: PathBuf) -> bool {
     };
 }
 
-pub fn hash_paths<'a>(paths: &'a Vec<PathBuf>, hasher: &'a Hasher) -> Vec<&'a PathBuf> {
+pub fn hash_paths<'a>(
+    paths: &'a Vec<PathBuf>,
+    hasher: &'a Hasher,
+    hash_cache: &HashCache,
+) -> Vec<&'a PathBuf> {
     paths
-        .into_par_iter()
-        .map(|path| match get_cached_hash(path, hasher, &paths, true) {
+        .par_iter()
+        .map(|path| match hash_cache.try_get(path, hasher) {
             Ok(_) => None,
             Err(err) => {
                 eprintln!("{err}");
@@ -68,36 +73,4 @@ pub fn hash_paths<'a>(paths: &'a Vec<PathBuf>, hasher: &'a Hasher) -> Vec<&'a Pa
         })
         .flatten()
         .collect()
-}
-
-fn get_cached_hash(
-    path: &PathBuf,
-    hasher: &Hasher,
-    other: &Vec<PathBuf>,
-    precache: bool,
-) -> Result<Arc<ImageHash>, Arc<String>> {
-    HASH_CACHE.try_get_with(path.to_owned(), || match hash_path(path, hasher) {
-        Ok(img) => Ok(Arc::new(img)),
-        Err(err) => {
-            // mark this image as "already checked" to prevent a million errors
-            if !precache {
-                let mut comp_cache = ALREADY_CHECKED_CACHE.lock().unwrap();
-                for other_path in other {
-                    comp_cache.insert((path.to_owned(), other_path.to_owned()));
-                }
-            }
-            Err(err)
-        }
-    })
-}
-
-fn hash_path(path: &PathBuf, hasher: &Hasher) -> Result<ImageHash, String> {
-    let img = image::open(path)
-        .map_err(|err| format!("Could not process '{}' - {err}", path.display()))?
-        // .adjust_contrast(30.0)
-        .into_rgba32f();
-
-    let img = DynamicImage::ImageRgba32F(img);
-
-    Ok(hasher.hash_image(&img))
 }

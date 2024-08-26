@@ -1,8 +1,11 @@
+use anyhow::Result;
 use args::Args;
+use cache::HashCache;
 use clap::Parser;
 use compare::hash_paths;
-use image_hasher::HasherConfig;
+use image_hasher::{HasherConfig, ImageHash};
 use rayon::{
+    iter::IntoParallelRefIterator,
     prelude::{IntoParallelIterator, ParallelIterator},
     ThreadPoolBuilder,
 };
@@ -10,53 +13,70 @@ use walkdir::WalkDir;
 
 use crate::compare::compare_imgs;
 use std::{
+    collections::HashMap,
+    fs,
     io::{stdout, Write},
     path::PathBuf,
+    sync::{Arc, Mutex},
 };
 
 mod args;
 mod cache;
 mod compare;
 
-fn main() {
+fn main() -> Result<()> {
     let args = Args::parse();
 
-    match gather_files(&args.filenames, args.recurse) {
-        Ok(mut entries) => {
-            let hasher = HasherConfig::new()
-                .hash_size(args.hash_size, args.hash_size)
-                .to_hasher();
+    ThreadPoolBuilder::new()
+        .num_threads(args.max_threads.unwrap_or(num_cpus::get()))
+        .build_global()?;
 
-            ThreadPoolBuilder::new()
-                .num_threads(args.max_threads.unwrap_or(num_cpus::get()))
-                .build_global()
-                .unwrap();
+    let mut entries = gather_files(&args.filenames, args.recurse)?;
 
-            eprint!("Calculating hashes... ");
-            stdout().flush().unwrap();
-            for err_path in hash_paths(&entries.clone(), &hasher) {
-                if let Some(index) = entries.iter().position(|e| e == err_path) {
-                    entries.remove(index);
-                }
-            }
-            eprintln!("done.");
+    let hashes: Arc<Mutex<HashMap<String, ImageHash>>> = Arc::new(Mutex::new(HashMap::new()));
+    let md5_map: Arc<Mutex<HashMap<PathBuf, String>>> = Arc::new(Mutex::new(
+        entries
+            .par_iter()
+            .map(|entry| {
+                let md5_hash = format!("{:x}", md5::compute(fs::read(entry)?));
 
-            if args.left_filenames.len() > 0 {
-                if let Ok(left_entries) = gather_files(&args.left_filenames, args.recurse) {
-                    left_entries.into_par_iter().for_each(move |left_entry| {
-                        compare_imgs(&left_entry, &entries, args.threshold, &hasher)
-                            .unwrap_or_else(|err| eprintln!("{err}"))
-                    });
-                }
-            } else {
-                entries.clone().into_par_iter().for_each(move |entry| {
-                    compare_imgs(&entry, &entries, args.threshold, &hasher)
-                        .unwrap_or_else(|err| eprintln!("{err}"))
-                });
-            }
+                Ok((entry.clone(), md5_hash))
+            })
+            .collect::<Result<_>>()?,
+    ));
+
+    let mut hash_cache = HashCache::load(args.hash_size, hashes, md5_map)?;
+
+    let hasher = HasherConfig::new()
+        .hash_size(args.hash_size, args.hash_size)
+        .to_hasher();
+
+    eprint!("Calculating hashes... ");
+    stdout().flush()?;
+    for err_path in hash_paths(&entries.clone(), &hasher, &mut hash_cache) {
+        if let Some(index) = entries.iter().position(|e| e == err_path) {
+            entries.remove(index);
         }
-        Err(err) => eprintln!("{err}"),
     }
+    eprintln!("done.");
+
+    if args.left_filenames.len() > 0 {
+        let left_entries = gather_files(&args.left_filenames, args.recurse)?;
+
+        left_entries.into_par_iter().for_each(move |left_entry| {
+            compare_imgs(&left_entry, &entries, args.threshold, &hasher, &hash_cache)
+                .unwrap_or_else(|err| eprintln!("{err}"))
+        });
+    } else {
+        entries.clone().into_par_iter().for_each(move |entry| {
+            compare_imgs(&entry, &entries, args.threshold, &hasher, &hash_cache)
+                .unwrap_or_else(|err| eprintln!("{err}"))
+        });
+    }
+
+    // hash_cache.lock().unwrap().save()?;
+
+    Ok(())
 }
 
 fn is_allowed_ext(filename: &PathBuf) -> bool {
@@ -72,7 +92,7 @@ fn is_allowed_ext(filename: &PathBuf) -> bool {
     allowed.contains(&ext.to_lowercase().as_str())
 }
 
-fn gather_files(filenames: &Vec<PathBuf>, recurse: bool) -> Result<Vec<PathBuf>, &str> {
+fn gather_files(filenames: &Vec<PathBuf>, recurse: bool) -> Result<Vec<PathBuf>> {
     let mut files: Box<dyn Iterator<Item = PathBuf>> = Box::new(
         filenames
             .iter()
@@ -116,8 +136,5 @@ fn gather_files(filenames: &Vec<PathBuf>, recurse: bool) -> Result<Vec<PathBuf>,
         })
         .collect();
 
-    match final_list.len() {
-        0 => Err("No files to process"),
-        _ => Ok(final_list),
-    }
+    Ok(final_list)
 }

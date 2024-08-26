@@ -9,13 +9,16 @@ license = "AGPL-3.0"
 edition = "2021"
 
 [dependencies]
+anyhow = "1.0.86"
 clap = { version = "4.1.4", features = ["derive"] }
+csv = "1.3.0"
 image = "0.25.2"
 image_hasher = "2.0.0"
 imgref = "1.9.4"
 lazy_static = "1.4.0"
-moka = "0.10.0"
+md5 = "0.7.0"
 num_cpus = "1.15.0"
 rayon = "1.6.1"
 rgb = "0.8.35"
+shellexpand = "3.1.0"
 walkdir = "2.3.2"
