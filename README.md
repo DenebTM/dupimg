@@ -7,7 +7,7 @@ A simple duplicate image finder.
 Checks the similarity of images specified on the command line, by hashing them
 and computing their hamming distance using the
 [image_hasher](https://github.com/qarmin/img_hash) library. Likely duplicates
-are printed in groups.
+are printed in groups on the command line.
 
 Both hash and hamming distance computations are multithreaded; comparing 2762
 images takes ~25 seconds on a Ryzen 9 5900X.
