@@ -1,6 +1,6 @@
 # dupimg
 
-A simple duplicate image finder.
+A minimal command-line duplicate image finder with persistent caching.
 
 ## Summary
 
@@ -49,6 +49,20 @@ Output groups are sorted alphabetically by path.
 
 When recurse is enabled, only PNG and JPG files will be checked. This also
 applies to filenames specified on the command line.
+
+## "Left-right" comparison
+
+`-l <FILE/DIRECTORY>` may be specified to perform comparisons between two
+distinct sets of images -- aka. determine which images in the "left" set are
+also present in the "right" set, instead of comparing all images with each
+other.
+
+`-l` must be specified per file/directory in order to assign them to the "left"
+set. It works in combination with `-r`/`--recurse`: e.g. `-r -l dir1/ dir2/`
+compares all images under `dir1/` with all images under `dir2/`.
+
+When `-l` is specified for a single file only, dupimg effectively becomes a
+local reverse image search utility.
 
 ## Threshold
 
