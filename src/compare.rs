@@ -16,22 +16,31 @@ pub fn compare(
     threshold: u32,
     hasher: &Hasher,
     hash_cache: &HashCache,
-    close_map: Arc<Mutex<HashMap<PathBuf, Arc<Mutex<HashMap<PathBuf, u32>>>>>>,
+    dist_matrix: Arc<Mutex<HashMap<PathBuf, HashMap<PathBuf, u32>>>>,
 ) -> Result<()> {
     let hash1 = hash_cache.try_get(path1, hasher)?;
     let hash2 = hash_cache.try_get(path2, hasher)?;
 
     let dist = hash1.dist(&hash2);
     if dist <= threshold {
-        let close_list = {
-            let mut locked_map = close_map.lock().unwrap();
-            if !locked_map.contains_key(path1) {
-                locked_map.insert(path1.clone(), Arc::new(Mutex::new(HashMap::new())));
+        let mut locked_matrix = dist_matrix.lock().unwrap();
+        let close_list1 = {
+            if !locked_matrix.contains_key(path1) {
+                locked_matrix.insert(path1.clone(), HashMap::new());
             }
 
-            locked_map.get(path1).unwrap().clone()
+            locked_matrix.get_mut(path1).unwrap()
         };
-        close_list.lock().unwrap().insert(path2.clone(), dist);
+        close_list1.insert(path2.clone(), dist);
+
+        let close_list2 = {
+            if !locked_matrix.contains_key(path2) {
+                locked_matrix.insert(path2.clone(), HashMap::new());
+            }
+
+            locked_matrix.get_mut(path2).unwrap()
+        };
+        close_list2.insert(path1.clone(), dist);
     }
 
     Ok(())
@@ -43,7 +52,7 @@ pub fn compare_all(
     threshold: u32,
     hasher: &Hasher,
     hash_cache: &HashCache,
-    close_map: Arc<Mutex<HashMap<PathBuf, Arc<Mutex<HashMap<PathBuf, u32>>>>>>,
+    dist_matrix: Arc<Mutex<HashMap<PathBuf, HashMap<PathBuf, u32>>>>,
 ) -> Result<()> {
     if other.len() == 0 {
         return Ok(());
@@ -58,7 +67,7 @@ pub fn compare_all(
                 threshold,
                 hasher,
                 hash_cache,
-                close_map.clone(),
+                dist_matrix.clone(),
             )
         })
         .collect()

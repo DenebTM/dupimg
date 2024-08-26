@@ -49,7 +49,7 @@ fn main() -> Result<()> {
     }
     eprintln!("done.");
 
-    let close_map: Arc<Mutex<HashMap<PathBuf, Arc<Mutex<HashMap<PathBuf, u32>>>>>> =
+    let dist_matrix: Arc<Mutex<HashMap<PathBuf, HashMap<PathBuf, u32>>>> =
         Arc::new(Mutex::new(HashMap::new()));
 
     eprint!("Computing hamming distances... ");
@@ -63,7 +63,7 @@ fn main() -> Result<()> {
                 args.threshold,
                 &hasher,
                 &hash_cache,
-                close_map.clone(),
+                dist_matrix.clone(),
             )
             .unwrap_or_else(|err| eprintln!("{err}"))
         });
@@ -84,29 +84,35 @@ fn main() -> Result<()> {
                 args.threshold,
                 &hasher,
                 &hash_cache,
-                close_map.clone(),
+                dist_matrix.clone(),
             )
             .unwrap_or_else(|err| eprintln!("{err}"))
         })
     }
     eprintln!("done.");
 
-    for (path1, close_list) in close_map
+    let mut printed: Vec<PathBuf> = Vec::new();
+
+    for (path1, close_list) in dist_matrix
         .lock()
         .unwrap()
         .clone()
         .into_iter()
         .sorted_by_cached_key(|(path1, _)| path1.clone())
     {
+        if printed.contains(&path1) {
+            continue;
+        }
+
         let path1 = path1.display().to_string().replace('\'', "\\'");
         println!("\n'{path1}'");
         for (path2, dist) in close_list
-            .lock()
-            .unwrap()
             .clone()
             .into_iter()
             .sorted_by_cached_key(|(path1, _)| path1.clone())
         {
+            printed.push(path2.clone());
+
             let path2 = path2.display().to_string().replace('\'', "\\'");
             println!("{dist:>6}\t'{path2}'");
         }
