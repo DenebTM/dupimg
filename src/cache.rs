@@ -1,5 +1,5 @@
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashMap,
     fs::{self, File},
     io::{LineWriter, Write},
     path::{Path, PathBuf},
@@ -10,14 +10,8 @@ use anyhow::{anyhow, Context, Result};
 
 use image::DynamicImage;
 use image_hasher::{Hasher, ImageHash};
-use lazy_static::lazy_static;
 
 static CACHE_LOCATION: &str = "~/.cache/dupimg";
-
-lazy_static! {
-    pub static ref ALREADY_CHECKED_CACHE: Mutex<HashSet<(PathBuf, PathBuf)>> =
-        Mutex::new(HashSet::new());
-}
 
 pub struct HashCache {
     hashes: Arc<Mutex<HashMap<PathBuf, Arc<ImageHash>>>>,
