@@ -47,6 +47,7 @@ fn main() -> Result<()> {
             entries.remove(index);
         }
     }
+    hash_cache.flush()?;
     eprintln!("done.");
 
     let dist_matrix: Arc<Mutex<HashMap<PathBuf, HashMap<PathBuf, u32>>>> =

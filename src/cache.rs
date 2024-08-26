@@ -27,7 +27,12 @@ impl HashCache {
         match csv::Reader::from_path(&persist_path) {
             Ok(mut csv_reader) => {
                 for result in csv_reader.records() {
-                    let record = result?;
+                    if let Err(err) = result {
+                        eprintln!("Warning: {err}");
+                        continue;
+                    }
+
+                    let record = result.unwrap();
                     let line = record.position().unwrap().line();
 
                     let path = record.get(0).map(PathBuf::from);
@@ -37,7 +42,7 @@ impl HashCache {
                         // ignore nonexistent files
                         if !path.exists() {
                             continue;
-                            // TODO: debug log?
+                            // TODO: verbose output?
                         }
 
                         let hash_base64 = record
@@ -80,20 +85,19 @@ impl HashCache {
     }
 
     pub fn save_all(&self) -> Result<()> {
-        self.csv_writer
-            .lock()
-            .unwrap()
+        let mut csv_writer = self.csv_writer.lock().unwrap();
+
+        csv_writer
             .write_record(&["path", "img_hash"])
             .context("Failed to write to persist file")?;
 
         for (path, img_hash) in self.hashes.lock().unwrap().iter() {
-            self.csv_writer
-                .lock()
-                .unwrap()
+            csv_writer
                 .write_record(&[path.display().to_string(), img_hash.to_base64()])
                 .context("Failed to write to persist file")?;
         }
 
+        csv_writer.flush()?;
         Ok(())
     }
 
@@ -104,6 +108,11 @@ impl HashCache {
             .write_record(&[path.display().to_string(), img_hash.to_base64()])
             .context("Failed to append to persist file")?;
 
+        Ok(())
+    }
+
+    pub fn flush(&self) -> Result<()> {
+        self.csv_writer.lock().unwrap().flush()?;
         Ok(())
     }
 
