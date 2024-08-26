@@ -1,7 +1,7 @@
 use std::{
     collections::HashMap,
     fs::{self, File},
-    path::{Path, PathBuf},
+    path::PathBuf,
     sync::{Arc, Mutex},
 };
 
@@ -10,17 +10,14 @@ use anyhow::{anyhow, Context, Result};
 use image::DynamicImage;
 use image_hasher::{Hasher, ImageHash};
 
-static CACHE_LOCATION: &str = "~/.cache/dupimg";
-
 pub struct HashCache {
     hashes: Arc<Mutex<HashMap<PathBuf, Arc<ImageHash>>>>,
     csv_writer: Arc<Mutex<csv::Writer<File>>>,
 }
 
 impl HashCache {
-    pub fn load(size: u32) -> Result<HashCache> {
-        let persist_path = Path::new(shellexpand::full(CACHE_LOCATION)?.as_ref())
-            .join(format!("hashes_{size}.csv"));
+    pub fn load(size: u32, cache_dir: PathBuf) -> Result<HashCache> {
+        let persist_path = cache_dir.join(format!("hashes_{size}.csv"));
 
         let mut path_map = HashMap::new();
 

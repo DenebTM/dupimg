@@ -14,6 +14,7 @@ use unique_tuple::UniqueTuple;
 
 use std::{
     collections::HashMap,
+    fs,
     io::{stdout, Write},
     path::PathBuf,
     sync::{Arc, Mutex},
@@ -28,13 +29,33 @@ mod unique_tuple;
 fn main() -> Result<()> {
     let args = Args::parse();
 
+    let cache_dir = PathBuf::from(shellexpand::full(&args.cache_dir)?.as_ref());
+
+    if args.clean {
+        eprintln!("Cleaning cache directory at '{}'", cache_dir.display());
+        for file in fs::read_dir(&cache_dir)?
+            .filter_map(Result::ok)
+            .filter(|e| {
+                e.path().is_file()
+                    && e.path()
+                        .extension()
+                        .map_or(false, |ext| ext.to_ascii_lowercase() == "csv")
+            })
+        {
+            fs::remove_file(file.path())?;
+        }
+    }
+
     ThreadPoolBuilder::new()
         .num_threads(args.max_threads.unwrap_or(num_cpus::get()))
         .build_global()?;
 
     let mut entries = gather_files(&args.filenames, args.recurse)?;
+    if entries.len() < 1 {
+        return Ok(());
+    }
 
-    let mut hash_cache = HashCache::load(args.hash_size)?;
+    let mut hash_cache = HashCache::load(args.hash_size, cache_dir)?;
 
     let hasher = HasherConfig::new()
         .hash_size(args.hash_size, args.hash_size)
@@ -54,8 +75,8 @@ fn main() -> Result<()> {
         Arc::new(Mutex::new(HashMap::new()));
 
     eprint!("Computing hamming distances... ");
-    if args.left_filenames.len() > 0 {
-        let left_entries = gather_files(&args.left_filenames, args.recurse)?;
+    if args.lhs_filenames.len() > 0 {
+        let left_entries = gather_files(&args.lhs_filenames, args.recurse)?;
 
         left_entries.into_par_iter().for_each(|left_entry| {
             compare::compare_all(
