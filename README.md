@@ -4,16 +4,17 @@ A simple duplicate image finder.
 
 ## Summary
 
-Checks the similarity between two images, using the SSIM algorithm implemented
-by `dssim-core`. Works on JPG and PNG images of any size by first rescaling
-them to 200x200 internally.
+Checks the similarity of images specified on the command line, by hashing them
+and computing their hamming distance using the
+[image_hasher](https://github.com/qarmin/img_hash) library. Likely duplicates
+are printed in groups.
 
-Runs multithreaded, every image is checked against every other one and there
-is no heuristic for e.g. finding likely candidates early, so while this is
-somewhat optimized, checking many files will likely still be very slow.
+Both hash and hamming distance computations are multithreaded; comparing 2762
+images takes ~25 seconds on a Ryzen 9 5900X.
 
-Note: I am rather inexperienced with Rust, so there will definitely be some
-dumb code here.
+Computed image hashes are persistently stored in CSV files under
+`~/.cache/dupimg/`, so that only the hamming distance calculations has to be
+re-done on subsequent comparisons with the same image.
 
 ## Installation
 
@@ -24,34 +25,50 @@ Either run `cargo install dupimg`, or clone this repository and run
 
 `dupimg [-r directory1/ directory2/ ...] file1.jpg file2.png ...`
 
+For additional information, see `dupimg --help`.
+
 ### Output format
 
+Output groups are sorted alphabetically by path.
+
 ```
-<IMAGE 1>       # path to first image
-<IMAGE 2>       # path to second image
-  SSIM: 0.0...  # positive and unbounded; lower values indicate a closer match
+<PATH 1>            # first image
+<DIST>  <PATH 2>    # hamming distance, first likely duplicate
+<DIST>  [PATH ...]  # other likely duplicates
+
+<PATH 3>            # second image
+<DIST>  <PATH 4>
+<DIST>  [PATH ...]
+
+[...]
 ```
 
-### Threshold
-
-The threshold for displaying a match may be set by e.g. `-t 0.01`. Only matches
-with a SSIM smaller or equal to this threshold will be displayed.
-
-The default is 0.1, as this tends to give good results with very few false
-positives.
-
-### Recurse
+## Recurse
 
 `-r` may be specified to enable traversing specified directories.
 
 When recurse is enabled, only PNG and JPG files will be checked. This also
 applies to filenames specified on the command line.
 
-For additional information, see `dupimg --help`.
+## Threshold
 
-### Note
+`-t <THRESHOLD>`, where THRESHOLD is a positive integer, may be specified to
+adjust the duplicate detection threshold.
 
-All program output is unsorted and unstable, do not rely on it.
+The default is 5, which with the default hash size errs on the side of caution,
+somewhat preferring false positives over false negatives. 0 gives very few false
+positives, but might miss some duplicates (e.g. due to compression artifacts).
+
+## Hash size
+
+`-h <SIZE>`, where `SIZE` is a positive integer, may be specified to change the
+size of image hashes.
+
+Different hash sizes are not comparable and are thus stored separately
+under `~/.cache/dupimg/`.
+
+The default hash size is 8 bytes, which works reasonably well for most images.
+Note that the detection threshold must be increased together with the hash size.
 
 ## Credits
 
