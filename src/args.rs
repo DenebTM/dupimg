@@ -17,7 +17,7 @@ pub struct Args {
                 When specified, each image listed under <LEFT_FILENAMES> will be checked\n\
                 against each image listed under <FILENAMES>.\n\
                 Must be specified for each file or directory individually.\n \
-                 e.g. -l <file1> -r -l <dir2>"
+                 e.g. -l <file1> -l <file2> <file3> <file4>"
     )]
     pub left_filenames: Vec<PathBuf>,
 
@@ -34,7 +34,7 @@ pub struct Args {
         long,
         default_value = "5",
         help = "Duplicate detection threshold\n\
-                Only show results with hash distance <= <THRESHOLD>\n"
+                Only show results with hamming distance <= <THRESHOLD>\n"
     )]
     pub threshold: u32,
 
@@ -43,7 +43,7 @@ pub struct Args {
         long = "s",
         default_value = "8",
         help = "Image hash size in bytes. Larger hashes are slower, but may allow for more precise \
-                comparisons. Duplicate detection threshold may need to be increased alongside this."
+                comparisons. Detection threshold should be increased alongside this parameter."
     )]
     pub hash_size: u32,
 
