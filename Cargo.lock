@@ -353,7 +353,6 @@ dependencies = [
  "image_hasher",
  "imgref",
  "lazy_static",
- "md5",
  "num_cpus",
  "rayon",
  "rgb",
@@ -653,12 +652,6 @@ checksum = "8ea1f30cedd69f0a2954655f7188c6a834246d2bcf1e315e2ac40c4b24dc9519"
 dependencies = [
  "cfg-if",
 ]
-
-[[package]]
-name = "md5"
-version = "0.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "490cc448043f947bae3cbee9c203358d62dbee0db12107a74be5c30ccfd09771"
 
 [[package]]
 name = "memchr"

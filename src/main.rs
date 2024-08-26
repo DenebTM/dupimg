@@ -3,9 +3,8 @@ use args::Args;
 use cache::HashCache;
 use clap::Parser;
 use compare::hash_paths;
-use image_hasher::{HasherConfig, ImageHash};
+use image_hasher::HasherConfig;
 use rayon::{
-    iter::IntoParallelRefIterator,
     prelude::{IntoParallelIterator, ParallelIterator},
     ThreadPoolBuilder,
 };
@@ -13,11 +12,8 @@ use walkdir::WalkDir;
 
 use crate::compare::compare_imgs;
 use std::{
-    collections::HashMap,
-    fs,
     io::{stdout, Write},
     path::PathBuf,
-    sync::{Arc, Mutex},
 };
 
 mod args;
@@ -33,19 +29,7 @@ fn main() -> Result<()> {
 
     let mut entries = gather_files(&args.filenames, args.recurse)?;
 
-    let hashes: Arc<Mutex<HashMap<String, ImageHash>>> = Arc::new(Mutex::new(HashMap::new()));
-    let md5_map: Arc<Mutex<HashMap<PathBuf, String>>> = Arc::new(Mutex::new(
-        entries
-            .par_iter()
-            .map(|entry| {
-                let md5_hash = format!("{:x}", md5::compute(fs::read(entry)?));
-
-                Ok((entry.clone(), md5_hash))
-            })
-            .collect::<Result<_>>()?,
-    ));
-
-    let mut hash_cache = HashCache::load(args.hash_size, hashes, md5_map)?;
+    let mut hash_cache = HashCache::load(args.hash_size)?;
 
     let hasher = HasherConfig::new()
         .hash_size(args.hash_size, args.hash_size)
@@ -74,7 +58,7 @@ fn main() -> Result<()> {
         });
     }
 
-    // hash_cache.lock().unwrap().save()?;
+    // hash_cache.save_all()?;
 
     Ok(())
 }

@@ -1,7 +1,7 @@
 use std::{
     collections::{HashMap, HashSet},
     fs::{self, File},
-    io::LineWriter,
+    io::{LineWriter, Write},
     path::{Path, PathBuf},
     sync::{Arc, Mutex},
 };
@@ -20,8 +20,7 @@ lazy_static! {
 }
 
 pub struct HashCache {
-    hashes: Arc<Mutex<HashMap<String, ImageHash>>>,
-    md5_map: Arc<Mutex<HashMap<PathBuf, String>>>,
+    hashes: Arc<Mutex<HashMap<PathBuf, Arc<ImageHash>>>>,
     csv_writer: Arc<Mutex<csv::Writer<LineWriter<File>>>>,
 }
 
@@ -37,61 +36,54 @@ impl HashCache {
         Ok(csv::Writer::from_writer(line_writer))
     }
 
-    pub fn load(
-        size: u32,
-        hashes: Arc<Mutex<HashMap<String, ImageHash>>>,
-        md5_map: Arc<Mutex<HashMap<PathBuf, String>>>,
-    ) -> Result<HashCache> {
+    pub fn load(size: u32) -> Result<HashCache> {
         let persist_path = Path::new(shellexpand::full(CACHE_LOCATION)?.as_ref())
             .join(format!("hashes_{size}.csv"));
 
-        let (existing_hashes, csv_writer) = match csv::Reader::from_path(&persist_path) {
-            Ok(mut csv_reader) => Ok((
-                csv_reader
-                    .records()
-                    .map(|result| -> Result<Option<(String, ImageHash)>> {
-                        let record = result?;
+        let mut path_map = HashMap::new();
 
-                        record
-                            .get(0)
-                            .map(|md5| {
-                                let hash_base64 = record.get(1).ok_or(anyhow!("Missing hash"))?;
+        match csv::Reader::from_path(&persist_path) {
+            Ok(mut csv_reader) => {
+                for result in csv_reader.records() {
+                    let record = result?;
+                    let line = record.position().unwrap().line();
 
-                                let img_hash = ImageHash::<Box<[u8]>>::from_base64(hash_base64)
-                                    .map_err(|_| anyhow!("Invalid base64 bytes"))?;
+                    let hash_base64 = record
+                        .get(1)
+                        .ok_or_else(|| anyhow!("Line {line}: Missing image hash"))?;
+                    let img_hash = ImageHash::<Box<[u8]>>::from_base64(hash_base64)
+                        .map_err(|_| anyhow!("Line {line}: Invalid base64 bytes"))?;
 
-                                Ok((md5.to_string(), img_hash))
-                            })
-                            .transpose()
-                    })
-                    .map(Result::transpose)
-                    .flatten()
-                    .collect::<Result<_>>()?,
-                Self::create_writer(&persist_path)?,
-            )),
+                    let path = record.get(0).map(PathBuf::from);
 
-            Err(err) => {
+                    let img_hash = Arc::new(img_hash);
+                    path_map.insert(path.unwrap(), img_hash.clone());
+                }
+
+                Ok(())
+            }
+
+            Err(err) => (|| -> Result<()> {
                 if let csv::ErrorKind::Io(io_err) = err.kind() {
-                    if let std::io::ErrorKind::NotFound = io_err.kind() {
+                    if io_err.kind() == std::io::ErrorKind::NotFound {
                         fs::create_dir_all(persist_path.parent().unwrap())
                             .context("Failed to create persist directory")?;
-                        File::create(&persist_path).context("Failed to create persist file")?;
+                        File::create(&persist_path)
+                            .and_then(|mut f| f.write(b"path,img_hash\n"))
+                            .context("Failed to create persist file")?;
 
-                        Ok((HashMap::new(), Self::create_writer(&persist_path)?))
-                    } else {
-                        Err(err)
+                        return Ok(());
                     }
-                } else {
-                    Err(err)
                 }
-            }
+
+                Err(err.into())
+            })(),
         }?;
 
-        hashes.lock().unwrap().extend(existing_hashes);
+        let csv_writer = Self::create_writer(&persist_path)?;
 
         Ok(HashCache {
-            hashes,
-            md5_map,
+            hashes: Arc::new(Mutex::new(path_map)),
             csv_writer: Arc::new(Mutex::new(csv_writer)),
         })
     }
@@ -100,39 +92,32 @@ impl HashCache {
     //     self.csv_writer
     //         .lock()
     //         .unwrap()
-    //         .write_record(&["md5", "img_hash"])
+    //         .write_record(&["path", "img_hash"])
     //         .context("Failed to write to persist file")?;
 
-    //     for (md5, img_hash) in self.hashes.lock().unwrap().iter() {
+    //     for (path, img_hash) in self.path_map.lock().unwrap().iter() {
     //         self.csv_writer
     //             .lock()
     //             .unwrap()
-    //             .write_record(&[md5, &img_hash.to_base64()])
+    //             .write_record(&[path.display().to_string(), img_hash.to_base64()])
     //             .context("Failed to write to persist file")?;
     //     }
 
     //     Ok(())
     // }
 
-    fn save_record(&self, (md5, img_hash): (&String, &ImageHash)) -> Result<()> {
+    fn save_record(&self, (path, img_hash): (&PathBuf, &ImageHash)) -> Result<()> {
         self.csv_writer
             .lock()
             .unwrap()
-            .write_record(&[md5, &img_hash.to_base64()])
+            .write_record(&[path.display().to_string(), img_hash.to_base64()])
             .context("Failed to append to persist file")?;
 
         Ok(())
     }
 
-    pub fn try_get(&self, path: &PathBuf, hasher: &Hasher) -> Result<ImageHash> {
-        if !self.md5_map.lock().unwrap().contains_key(path) {
-            let var_name = format!("{:x}", md5::compute(fs::read(path)?));
-            let md5 = var_name;
-            self.md5_map.lock().unwrap().insert(path.clone(), md5);
-        }
-        let md5 = self.md5_map.lock().unwrap().get(path).unwrap().clone();
-
-        let maybe_hash = self.hashes.lock().unwrap().get(&md5).cloned();
+    pub fn try_get(&self, path: &PathBuf, hasher: &Hasher) -> Result<Arc<ImageHash>> {
+        let maybe_hash = self.hashes.lock().unwrap().get(path).cloned();
         Ok(if let Some(img_hash) = maybe_hash {
             img_hash
         } else {
@@ -142,12 +127,12 @@ impl HashCache {
                 .into_rgba32f();
 
             let img = DynamicImage::ImageRgba32F(img);
-            let img_hash = hasher.hash_image(&img);
+            let img_hash = Arc::new(hasher.hash_image(&img));
             self.hashes
                 .lock()
                 .unwrap()
-                .insert(md5.clone(), img_hash.clone());
-            self.save_record((&md5, &img_hash))?;
+                .insert(path.clone(), img_hash.clone());
+            self.save_record((&path, &img_hash))?;
 
             img_hash
         })
