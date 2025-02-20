@@ -1,12 +1,11 @@
-use std::path::PathBuf;
+pub mod cache;
 
 use anyhow::{Context, Result};
 use cache::HashCache;
 use image::DynamicImage;
 use image_hasher::{Hasher, ImageHash};
-use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
-
-pub mod cache;
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
+use std::path::PathBuf;
 
 pub fn hash(path: &PathBuf, hasher: &Hasher) -> Result<ImageHash> {
     let img = image::open(path.clone())
@@ -34,27 +33,30 @@ pub struct HashAllResult {
     pub notfound: Vec<PathBuf>,
 }
 
-pub fn hash_all<'a>(
-    paths: &'a Vec<PathBuf>,
+pub fn hash_all<'a, I>(
+    paths: &'a I,
     hasher: &'a Hasher,
     hash_cache: &HashCache,
-) -> Result<HashAllResult> {
+) -> Result<HashAllResult>
+where
+    &'a I: IntoIterator<Item = &'a PathBuf> + IntoParallelIterator<Item = &'a PathBuf>,
+{
     let notfound: Vec<PathBuf> = paths
-        .iter()
+        .into_iter()
         .filter(|path| !path.exists())
         .cloned()
         .collect();
 
     let cached: Vec<PathBuf> = paths
-        .iter()
+        .into_iter()
         .filter(|path| hash_cache.contains(path))
         .cloned()
         .collect();
 
     let (new, failed): (Vec<PathBuf>, Vec<PathBuf>) = paths
-        .par_iter()
+        .into_par_iter()
         .map(
-            |path| match hash_cache.try_get_with(path, || hash(path, hasher)) {
+            |path| match hash_cache.try_get_with(&path, || hash(&path, hasher)) {
                 Ok(_) => (Some(path.clone()), None),
                 Err(err) => {
                     eprintln!("{err}");

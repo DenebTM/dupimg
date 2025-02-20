@@ -11,12 +11,9 @@ use files::gather_files;
 use hash::{cache::HashCache, hash_all};
 use image_hasher::HasherConfig;
 use itertools::{all, Itertools};
-use rayon::{
-    prelude::{IntoParallelIterator, ParallelIterator},
-    ThreadPoolBuilder,
-};
+use rayon::{iter::IntoParallelRefIterator, prelude::ParallelIterator, ThreadPoolBuilder};
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     fs,
     path::PathBuf,
     sync::{Arc, Mutex},
@@ -48,6 +45,7 @@ fn main() -> Result<()> {
         .build_global()?;
 
     let mut entries = gather_files(&args.filenames, args.recurse)?;
+    let mut lhs_entries = gather_files(&args.lhs_filenames, args.recurse)?;
     if entries.len() < 1 {
         return Ok(());
     }
@@ -55,18 +53,22 @@ fn main() -> Result<()> {
     let mut hash_cache = HashCache::load(args.hash_size, cache_dir)?;
     eprintln!("Loaded {} entries from cache.", hash_cache.len());
 
-    let all_cached = all(&entries, |path| hash_cache.contains(path));
+    let all_cached = all(entries.iter().chain(lhs_entries.iter()), |path| {
+        hash_cache.contains(path)
+    });
     if !all_cached {
         let hasher = HasherConfig::new()
             .hash_size(args.hash_size, args.hash_size)
             .to_hasher();
 
+        let all_entries: HashSet<PathBuf> =
+            entries.iter().chain(lhs_entries.iter()).cloned().collect();
+
         eprintln!("Computing hashes... ");
-        let hash_result = hash_all(&entries, &hasher, &mut hash_cache)?;
+        let hash_result = hash_all(&all_entries, &hasher, &mut hash_cache)?;
         for err_path in hash_result.failed.iter().chain(&hash_result.notfound) {
-            if let Some(index) = entries.iter().position(|e| e == err_path) {
-                entries.remove(index);
-            }
+            entries.remove(err_path);
+            lhs_entries.remove(err_path);
         }
         eprintln!("done.");
     }
@@ -75,10 +77,8 @@ fn main() -> Result<()> {
         Arc::new(Mutex::new(HashMap::new()));
 
     eprintln!("Computing hamming distances... ");
-    if args.lhs_filenames.len() > 0 {
-        let left_entries = gather_files(&args.lhs_filenames, args.recurse)?;
-
-        left_entries.into_par_iter().for_each(|left_entry| {
+    if lhs_entries.len() > 0 {
+        lhs_entries.par_iter().for_each(|left_entry| {
             compare::compare_all(
                 &left_entry,
                 &entries,
@@ -98,7 +98,7 @@ fn main() -> Result<()> {
             .map(UniqueTuple::into)
             .collect();
 
-        combs.into_par_iter().for_each(|(path1, path2)| {
+        combs.par_iter().for_each(|(path1, path2)| {
             compare::compare(
                 path1,
                 path2,

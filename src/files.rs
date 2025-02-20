@@ -1,5 +1,5 @@
 use anyhow::Result;
-use std::path::PathBuf;
+use std::{collections::HashSet, path::PathBuf};
 use walkdir::WalkDir;
 
 fn is_allowed_ext(filename: &PathBuf) -> bool {
@@ -15,7 +15,7 @@ fn is_allowed_ext(filename: &PathBuf) -> bool {
     allowed.contains(&ext.to_lowercase().as_str())
 }
 
-pub fn gather_files(filenames: &Vec<PathBuf>, recurse: bool) -> Result<Vec<PathBuf>> {
+pub fn gather_files(filenames: &Vec<PathBuf>, recurse: bool) -> Result<HashSet<PathBuf>> {
     let mut files: Box<dyn Iterator<Item = PathBuf>> = Box::new(
         filenames
             .iter()
@@ -49,7 +49,7 @@ pub fn gather_files(filenames: &Vec<PathBuf>, recurse: bool) -> Result<Vec<PathB
         files = Box::new(files.chain(dirs));
     }
 
-    let final_list: Vec<_> = files
+    let final_list = files
         .into_iter()
         .map(|path| (path.clone(), path.canonicalize()))
         .filter_map(|(path, canon_path)| match canon_path {

@@ -119,12 +119,6 @@ impl HashCache {
         self.hashes.lock().unwrap().contains_key(path)
     }
 
-    pub fn remove<I>(&self, paths: &I)
-    where
-        I: Iterator<Item = PathBuf>,
-    {
-    }
-
     pub fn get(&self, path: &PathBuf) -> Option<Arc<ImageHash>> {
         self.hashes.lock().unwrap().get(path).cloned()
     }
