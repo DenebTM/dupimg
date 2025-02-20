@@ -63,14 +63,21 @@ fn main() -> Result<()> {
 
         let all_entries: HashSet<PathBuf> =
             entries.iter().chain(lhs_entries.iter()).cloned().collect();
+        let total = all_entries.len();
 
         eprintln!("Computing hashes... ");
         let hash_result = hash_all(&all_entries, &hasher, &mut hash_cache)?;
+        eprintln!("done.");
+
         for err_path in hash_result.failed.iter().chain(&hash_result.notfound) {
             entries.remove(err_path);
             lhs_entries.remove(err_path);
         }
-        eprintln!("done.");
+
+        println!("in cache:  {:6>} / {total:6>}", hash_result.cached.len());
+        println!("hashed:    {:6>} / {total:6>}", hash_result.new.len());
+        println!("failed:    {:6>} / {total:6>}", hash_result.failed.len());
+        println!("not found: {:6>} / {total:6>}", hash_result.notfound.len());
     }
 
     let dist_matrix: Arc<Mutex<HashMap<PathBuf, HashMap<PathBuf, u32>>>> =
