@@ -76,39 +76,34 @@ fn main() -> Result<()> {
     let dist_matrix: Arc<Mutex<HashMap<PathBuf, HashMap<PathBuf, u32>>>> =
         Arc::new(Mutex::new(HashMap::new()));
 
-    eprintln!("Computing hamming distances... ");
-    if lhs_entries.len() > 0 {
-        lhs_entries.par_iter().for_each(|left_entry| {
-            compare::compare_all(
-                &left_entry,
-                &entries,
-                args.threshold,
-                &hash_cache,
-                dist_matrix.clone(),
-            )
-            .unwrap_or_else(|err| eprintln!("{err}"))
-        });
+    // check against original args in case all LHS entries were invalid and removed
+    let combs: HashSet<UniqueTuple<PathBuf>> = if args.lhs_filenames.len() > 0 {
+        lhs_entries
+            .iter()
+            .cartesian_product(&entries)
+            .filter(|(a, b)| a != b)
+            .map(|(a, b)| UniqueTuple(a.clone(), b.clone()))
+            .collect()
     } else {
-        let combs: Vec<(&PathBuf, &PathBuf)> = entries
+        entries
             .iter()
             .tuple_combinations()
             .filter(|(a, b)| a != b)
-            .map(UniqueTuple::from)
-            .unique()
-            .map(UniqueTuple::into)
-            .collect();
+            .map(|(a, b)| UniqueTuple(a.clone(), b.clone()))
+            .collect()
+    };
 
-        combs.par_iter().for_each(|(path1, path2)| {
-            compare::compare(
-                path1,
-                path2,
-                args.threshold,
-                &hash_cache,
-                dist_matrix.clone(),
-            )
-            .unwrap_or_else(|err| eprintln!("{err}"))
-        })
-    }
+    eprintln!("Computing hamming distances... ");
+    combs.par_iter().for_each(|UniqueTuple(path1, path2)| {
+        compare::compare(
+            path1,
+            path2,
+            args.threshold,
+            &hash_cache,
+            dist_matrix.clone(),
+        )
+        .unwrap_or_else(|err| eprintln!("{err}"))
+    });
     eprintln!("done.");
 
     let mut printed: Vec<PathBuf> = Vec::new();
