@@ -38,7 +38,7 @@ pub fn hash_all<'a>(
     paths: &'a Vec<PathBuf>,
     hasher: &'a Hasher,
     hash_cache: &HashCache,
-) -> HashAllResult {
+) -> Result<HashAllResult> {
     let notfound: Vec<PathBuf> = paths
         .iter()
         .filter(|path| !path.exists())
@@ -65,10 +65,12 @@ pub fn hash_all<'a>(
         .flatten()
         .collect();
 
-    HashAllResult {
+    hash_cache.flush_writes()?;
+
+    Ok(HashAllResult {
         cached,
         new,
         failed,
         notfound,
-    }
+    })
 }

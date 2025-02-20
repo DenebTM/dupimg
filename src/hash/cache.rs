@@ -111,11 +111,15 @@ impl HashCache {
         Ok(())
     }
 
+    pub fn len(&self) -> usize {
+        self.hashes.lock().unwrap().len()
+    }
+
     pub fn contains(&self, path: &PathBuf) -> bool {
         self.hashes.lock().unwrap().contains_key(path)
     }
 
-    pub fn extend<I>(&self, paths: &I)
+    pub fn remove<I>(&self, paths: &I)
     where
         I: Iterator<Item = PathBuf>,
     {

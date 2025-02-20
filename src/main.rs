@@ -10,7 +10,7 @@ use clap::Parser;
 use files::gather_files;
 use hash::{cache::HashCache, hash_all};
 use image_hasher::HasherConfig;
-use itertools::Itertools;
+use itertools::{all, Itertools};
 use rayon::{
     prelude::{IntoParallelIterator, ParallelIterator},
     ThreadPoolBuilder,
@@ -53,19 +53,23 @@ fn main() -> Result<()> {
     }
 
     let mut hash_cache = HashCache::load(args.hash_size, cache_dir)?;
+    eprintln!("Loaded {} entries from cache.", hash_cache.len());
 
-    let hasher = HasherConfig::new()
-        .hash_size(args.hash_size, args.hash_size)
-        .to_hasher();
+    let all_cached = all(&entries, |path| hash_cache.contains(path));
+    if !all_cached {
+        let hasher = HasherConfig::new()
+            .hash_size(args.hash_size, args.hash_size)
+            .to_hasher();
 
-    eprintln!("Computing hashes... ");
-    let hash_result = hash_all(&entries, &hasher, &mut hash_cache);
-    for err_path in hash_result.failed.iter().chain(&hash_result.notfound) {
-        if let Some(index) = entries.iter().position(|e| e == err_path) {
-            entries.remove(index);
+        eprintln!("Computing hashes... ");
+        let hash_result = hash_all(&entries, &hasher, &mut hash_cache)?;
+        for err_path in hash_result.failed.iter().chain(&hash_result.notfound) {
+            if let Some(index) = entries.iter().position(|e| e == err_path) {
+                entries.remove(index);
+            }
         }
+        eprintln!("done.");
     }
-    eprintln!("done.");
 
     let dist_matrix: Arc<Mutex<HashMap<PathBuf, HashMap<PathBuf, u32>>>> =
         Arc::new(Mutex::new(HashMap::new()));
@@ -79,7 +83,6 @@ fn main() -> Result<()> {
                 &left_entry,
                 &entries,
                 args.threshold,
-                &hasher,
                 &hash_cache,
                 dist_matrix.clone(),
             )
@@ -100,7 +103,6 @@ fn main() -> Result<()> {
                 path1,
                 path2,
                 args.threshold,
-                &hasher,
                 &hash_cache,
                 dist_matrix.clone(),
             )
