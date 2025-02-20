@@ -74,10 +74,10 @@ fn main() -> Result<()> {
             lhs_entries.remove(err_path);
         }
 
-        println!("in cache:  {:6>} / {total:6>}", hash_result.cached.len());
-        println!("hashed:    {:6>} / {total:6>}", hash_result.new.len());
-        println!("failed:    {:6>} / {total:6>}", hash_result.failed.len());
-        println!("not found: {:6>} / {total:6>}", hash_result.notfound.len());
+        eprintln!("in cache:  {:6>} / {total:6>}", hash_result.cached.len());
+        eprintln!("hashed:    {:6>} / {total:6>}", hash_result.new.len());
+        eprintln!("failed:    {:6>} / {total:6>}", hash_result.failed.len());
+        eprintln!("not found: {:6>} / {total:6>}", hash_result.notfound.len());
     }
 
     let dist_matrix: Arc<Mutex<HashMap<PathBuf, HashMap<PathBuf, u32>>>> =
