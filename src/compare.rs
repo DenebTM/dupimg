@@ -1,8 +1,7 @@
 use crate::hash::cache::HashCache;
 use anyhow::Result;
-use rayon::{iter::IntoParallelRefIterator, prelude::ParallelIterator};
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashMap,
     path::PathBuf,
     sync::{Arc, Mutex},
 };
@@ -44,21 +43,4 @@ pub fn compare(
     }
 
     Ok(())
-}
-
-pub fn compare_all(
-    path1: &PathBuf,
-    other: &HashSet<PathBuf>,
-    threshold: u32,
-    hash_cache: &HashCache,
-    dist_matrix: Arc<Mutex<HashMap<PathBuf, HashMap<PathBuf, u32>>>>,
-) -> Result<()> {
-    if other.len() == 0 {
-        return Ok(());
-    }
-
-    other
-        .par_iter()
-        .map(|path2| compare(path1, path2, threshold, hash_cache, dist_matrix.clone()))
-        .collect()
 }
