@@ -1,29 +1,27 @@
+mod args;
+mod compare;
+mod files;
+mod hash;
+mod unique_tuple;
+
 use anyhow::Result;
 use args::Args;
-use cache::HashCache;
 use clap::Parser;
-use compare::hash_paths;
 use files::gather_files;
+use hash::{cache::HashCache, hash_all};
 use image_hasher::HasherConfig;
 use itertools::Itertools;
 use rayon::{
     prelude::{IntoParallelIterator, ParallelIterator},
     ThreadPoolBuilder,
 };
-use unique_tuple::UniqueTuple;
-
 use std::{
     collections::HashMap,
     fs,
     path::PathBuf,
     sync::{Arc, Mutex},
 };
-
-mod args;
-mod cache;
-mod compare;
-mod files;
-mod unique_tuple;
+use unique_tuple::UniqueTuple;
 
 fn main() -> Result<()> {
     let args = Args::parse();
@@ -60,13 +58,13 @@ fn main() -> Result<()> {
         .hash_size(args.hash_size, args.hash_size)
         .to_hasher();
 
-    eprintln!("Calculating hashes... ");
-    for err_path in hash_paths(&entries.clone(), &hasher, &mut hash_cache) {
+    eprintln!("Computing hashes... ");
+    let hash_result = hash_all(&entries, &hasher, &mut hash_cache);
+    for err_path in hash_result.failed.iter().chain(&hash_result.notfound) {
         if let Some(index) = entries.iter().position(|e| e == err_path) {
             entries.remove(index);
         }
     }
-    hash_cache.flush()?;
     eprintln!("done.");
 
     let dist_matrix: Arc<Mutex<HashMap<PathBuf, HashMap<PathBuf, u32>>>> =

@@ -1,14 +1,11 @@
+use anyhow::{anyhow, Context, Result};
+use image_hasher::ImageHash;
 use std::{
     collections::HashMap,
     fs::{self, File},
     path::PathBuf,
     sync::{Arc, Mutex},
 };
-
-use anyhow::{anyhow, Context, Result};
-
-use image::DynamicImage;
-use image_hasher::{Hasher, ImageHash};
 
 pub struct HashCache {
     hashes: Arc<Mutex<HashMap<PathBuf, Arc<ImageHash>>>>,
@@ -81,7 +78,7 @@ impl HashCache {
         Ok(_self)
     }
 
-    pub fn save_all(&self) -> Result<()> {
+    fn save_all(&self) -> Result<()> {
         let mut csv_writer = self.csv_writer.lock().unwrap();
 
         csv_writer
@@ -108,30 +105,44 @@ impl HashCache {
         Ok(())
     }
 
-    pub fn flush(&self) -> Result<()> {
-        self.csv_writer.lock().unwrap().flush()?;
+    pub fn flush_writes(&self) -> Result<()> {
+        let mut csv_writer = self.csv_writer.lock().unwrap();
+        csv_writer.flush()?;
         Ok(())
     }
 
-    pub fn try_get(&self, path: &PathBuf, hasher: &Hasher) -> Result<Arc<ImageHash>> {
-        let maybe_hash = self.hashes.lock().unwrap().get(path).cloned();
-        Ok(if let Some(img_hash) = maybe_hash {
-            img_hash
-        } else {
-            let img = image::open(path.clone())
-                .with_context(|| format!("Could not process '{}'", path.display()))?
-                // .adjust_contrast(30.0)
-                .into_rgba32f();
+    pub fn contains(&self, path: &PathBuf) -> bool {
+        self.hashes.lock().unwrap().contains_key(path)
+    }
 
-            let img = DynamicImage::ImageRgba32F(img);
-            let img_hash = Arc::new(hasher.hash_image(&img));
-            self.hashes
-                .lock()
-                .unwrap()
-                .insert(path.clone(), img_hash.clone());
-            self.save_record((&path, &img_hash))?;
+    pub fn extend<I>(&self, paths: &I)
+    where
+        I: Iterator<Item = PathBuf>,
+    {
+    }
 
-            img_hash
+    pub fn get(&self, path: &PathBuf) -> Option<Arc<ImageHash>> {
+        self.hashes.lock().unwrap().get(path).cloned()
+    }
+
+    pub fn try_get_with(
+        &self,
+        path: &PathBuf,
+        init: impl FnOnce() -> Result<ImageHash>,
+    ) -> Result<Arc<ImageHash>> {
+        Ok(match self.hashes.lock().unwrap().get(path).cloned() {
+            Some(img_hash) => img_hash,
+
+            None => {
+                let img_hash = Arc::new(init()?);
+                self.hashes
+                    .lock()
+                    .unwrap()
+                    .insert(path.clone(), img_hash.clone());
+                self.save_record((&path, &img_hash))?;
+
+                img_hash
+            }
         })
     }
 }
