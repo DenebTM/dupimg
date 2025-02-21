@@ -5,8 +5,8 @@ use std::path::PathBuf;
 #[command(author, version, about, long_about = None)]
 pub struct Args {
     #[arg(
-        required=true,
-        num_args=1..,
+        required_unless_present = "clean",
+        num_args = 1..,
         help = "[Right: see --lhs] Files (and/or directories: -r) to check"
     )]
     pub filenames: Vec<PathBuf>,

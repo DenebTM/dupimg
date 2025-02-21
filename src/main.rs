@@ -43,6 +43,10 @@ fn main() -> Result<()> {
         {
             fs::remove_file(file.path())?;
         }
+
+        if args.filenames.is_empty() {
+            return Ok(());
+        }
     }
 
     ThreadPoolBuilder::new()
