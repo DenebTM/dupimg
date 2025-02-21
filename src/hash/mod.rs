@@ -47,7 +47,7 @@ where
         .cloned()
         .collect();
 
-    let cached: Vec<PathBuf> = paths
+    let cached = paths
         .into_iter()
         .filter(|path| hash_cache.contains(path))
         .cloned()
@@ -65,6 +65,11 @@ where
             },
         )
         .flatten()
+        .collect();
+
+    let failed = failed
+        .into_iter()
+        .filter(|path| !notfound.contains(path))
         .collect();
 
     hash_cache.flush_writes()?;

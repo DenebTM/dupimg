@@ -15,26 +15,26 @@ fn is_allowed_ext(filename: &PathBuf) -> bool {
     allowed.contains(&ext.to_lowercase().as_str())
 }
 
-pub fn gather_files(filenames: &Vec<PathBuf>, recurse: bool) -> Result<HashSet<PathBuf>> {
+pub fn gather_files<'a, I>(filenames: &'a I, recurse: bool) -> Result<HashSet<PathBuf>>
+where
+    &'a I: IntoIterator<Item = &'a PathBuf>,
+{
     let mut files: Box<dyn Iterator<Item = PathBuf>> = Box::new(
         filenames
-            .iter()
+            .into_iter()
             .filter(|path| {
-                (path.exists() || {
-                    eprintln!("Ignoring '{}': file not found", path.display());
-                    false
-                }) && (path.is_file()
+                path.is_file()
                     || !recurse && {
                         eprintln!("Ignoring '{}': --recurse not set", path.display());
                         false
-                    })
+                    }
             })
-            .map(ToOwned::to_owned),
+            .cloned(),
     );
 
     if recurse {
         let dirs = filenames
-            .iter()
+            .into_iter()
             .filter(|f| f.is_dir())
             .map(|f| {
                 WalkDir::new(f)
