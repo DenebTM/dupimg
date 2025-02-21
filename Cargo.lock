@@ -350,6 +350,7 @@ dependencies = [
  "anyhow",
  "clap",
  "csv",
+ "either",
  "image",
  "image_hasher",
  "imgref",

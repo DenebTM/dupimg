@@ -81,34 +81,34 @@ fn main() -> Result<()> {
         Arc::new(Mutex::new(HashMap::new()));
 
     // check against original args in case all LHS entries were invalid and removed
-    let combs: HashSet<UniqueTuple<PathBuf>> = if args.lhs_filenames.len() > 0 {
-        lhs_entries
-            .iter()
-            .cartesian_product(&entries)
-            .filter(|(a, b)| a != b)
-            .map(|(a, b)| UniqueTuple(a.clone(), b.clone()))
-            .collect()
+    let combs: Either<_, _> = if args.lhs_filenames.len() > 0 {
+        Left(lhs_entries.iter().cartesian_product(&entries))
     } else {
-        entries
-            .iter()
-            .tuple_combinations()
-            .filter(|(a, b)| a != b)
-            .map(|(a, b)| UniqueTuple(a.clone(), b.clone()))
-            .collect()
+        Right(entries.iter().tuple_combinations())
     };
 
-    eprintln!("Computing hamming distances... ");
     let readonly_cache = hash_cache.readonly();
-    combs.par_iter().for_each(|UniqueTuple(path1, path2)| {
-        compare::compare(
-            path1,
-            path2,
-            args.threshold,
-            &readonly_cache,
-            dist_matrix.clone(),
-        )
-        .unwrap_or_else(|err| eprintln!("{err}"))
-    });
+    let dist_matrix: Arc<Mutex<HashMap<PathBuf, HashMap<PathBuf, u32>>>> =
+        Arc::new(Mutex::new(HashMap::new()));
+
+    eprintln!("Computing hamming distances... ");
+    combs
+        .into_iter()
+        .filter(|(a, b)| a != b)
+        .map(UniqueTuple::from)
+        .unique()
+        .par_bridge()
+        .into_par_iter()
+        .for_each(|UniqueTuple(path1, path2)| {
+            compare::compare(
+                path1,
+                path2,
+                args.threshold,
+                &readonly_cache,
+                dist_matrix.clone(),
+            )
+            .unwrap_or_else(|err| eprintln!("{err}"))
+        });
     eprintln!("done.");
 
     let mut printed: Vec<PathBuf> = Vec::new();
