@@ -46,9 +46,6 @@ fn main() -> Result<()> {
 
     let mut entries = gather_files(&args.filenames, args.recurse)?;
     let mut lhs_entries = gather_files(&args.lhs_filenames, args.recurse)?;
-    if entries.len() < 1 {
-        return Ok(());
-    }
 
     let mut hash_cache = HashCache::load(args.hash_size, cache_dir)?;
     eprintln!("Loaded {} entries from cache.", hash_cache.len());

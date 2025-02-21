@@ -4,7 +4,11 @@ use std::path::PathBuf;
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 pub struct Args {
-    #[arg(help = "[Right: see --lhs] Files (and/or directories: -r) to check")]
+    #[arg(
+        required=true,
+        num_args=1..,
+        help = "[Right: see --lhs] Files (and/or directories: -r) to check"
+    )]
     pub filenames: Vec<PathBuf>,
 
     #[arg(
@@ -36,8 +40,8 @@ pub struct Args {
     pub threshold: u32,
 
     #[arg(
-        short,
-        long = "s",
+        short = 's',
+        long = "hash-size",
         default_value = "8",
         help = "Image hash size in bytes. Larger hashes are slower, but may allow for more\n\
                 precise comparisons. Detection threshold should be increased alongside this\n\
