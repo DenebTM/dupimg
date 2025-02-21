@@ -100,7 +100,7 @@ impl HashCache {
             .lock()
             .unwrap()
             .write_record(&[path.display().to_string(), img_hash.to_base64()])
-            .context("Failed to append to persist file")?;
+            .context("Failed to write to persist file")?;
 
         Ok(())
     }
