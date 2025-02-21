@@ -23,7 +23,6 @@ use std::{
     path::PathBuf,
     sync::{Arc, Mutex},
 };
-use unique_tuple::UniqueTuple;
 
 fn main() -> Result<()> {
     let args = Args::parse();
@@ -118,11 +117,9 @@ fn main() -> Result<()> {
     combs
         .into_iter()
         .filter(|(a, b)| a != b)
-        .map(UniqueTuple::from)
-        .unique()
         .par_bridge()
         .into_par_iter()
-        .for_each(|UniqueTuple(path1, path2)| {
+        .for_each(|(path1, path2)| {
             compare::compare(
                 path1,
                 path2,

@@ -1,4 +1,5 @@
 use anyhow::Result;
+use itertools::Itertools;
 use std::{collections::HashSet, path::PathBuf};
 use walkdir::WalkDir;
 
@@ -65,6 +66,7 @@ where
                 false
             }
         })
+        .unique()
         .collect();
 
     Ok(final_list)
