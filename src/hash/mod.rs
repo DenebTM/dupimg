@@ -47,30 +47,38 @@ where
         .cloned()
         .collect();
 
-    let cached = paths
+    let cached: Vec<PathBuf> = paths
         .into_iter()
         .filter(|path| hash_cache.contains(path))
         .cloned()
         .collect();
 
-    let (new, failed): (Vec<PathBuf>, Vec<PathBuf>) = paths
+    let results: Vec<(PathBuf, Option<()>)> = paths
         .into_par_iter()
-        .map(
-            |path| match hash_cache.try_get_with(&path, || hash(&path, hasher)) {
-                Ok(_) => (Some(path.clone()), None),
-                Err(err) => {
-                    eprintln!("{err}");
-                    (None, Some(path.clone()))
-                }
-            },
-        )
-        .flatten()
+        .map(|path| {
+            (
+                path.clone(),
+                match hash_cache.try_get_with(&path, || hash(&path, hasher)) {
+                    Ok(_) => Some(()),
+                    Err(err) => {
+                        eprintln!("{}", err);
+                        None
+                    }
+                },
+            )
+        })
         .collect();
 
-    let failed = failed
-        .into_iter()
-        .filter(|path| !notfound.contains(path))
-        .collect();
+    let mut new = Vec::new();
+    let mut failed = Vec::new();
+    results.iter().for_each(|(path, res)| match res {
+        Some(_) => new.push(path.clone()),
+        None => {
+            if !notfound.contains(path) {
+                failed.push(path.clone())
+            }
+        }
+    });
 
     hash_cache.flush_writes()?;
 

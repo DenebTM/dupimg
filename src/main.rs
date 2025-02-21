@@ -7,11 +7,16 @@ mod unique_tuple;
 use anyhow::Result;
 use args::Args;
 use clap::Parser;
+use either::Either::{self, Left, Right};
 use files::gather_files;
 use hash::{cache::HashCache, hash_all};
 use image_hasher::HasherConfig;
 use itertools::{all, Itertools};
-use rayon::{iter::IntoParallelRefIterator, prelude::ParallelIterator, ThreadPoolBuilder};
+use rayon::{
+    iter::{IntoParallelIterator, ParallelBridge},
+    prelude::ParallelIterator,
+    ThreadPoolBuilder,
+};
 use std::{
     collections::{HashMap, HashSet},
     fs,
@@ -46,6 +51,8 @@ fn main() -> Result<()> {
 
     let mut entries = gather_files(&args.filenames, args.recurse)?;
     let mut lhs_entries = gather_files(&args.lhs_filenames, args.recurse)?;
+    let all_entries: HashSet<PathBuf> = entries.iter().chain(lhs_entries.iter()).cloned().collect();
+    let total = all_entries.len();
 
     let mut hash_cache = HashCache::load(args.hash_size, cache_dir)?;
     eprintln!("Loaded {} entries from cache.", hash_cache.len());
@@ -53,14 +60,10 @@ fn main() -> Result<()> {
     let all_cached = all(entries.iter().chain(lhs_entries.iter()), |path| {
         hash_cache.contains(path)
     });
-    if !all_cached {
+    let (cached, new, failed, notfound) = if !all_cached {
         let hasher = HasherConfig::new()
             .hash_size(args.hash_size, args.hash_size)
             .to_hasher();
-
-        let all_entries: HashSet<PathBuf> =
-            entries.iter().chain(lhs_entries.iter()).cloned().collect();
-        let total = all_entries.len();
 
         eprintln!("Computing hashes... ");
         let hash_result = hash_all(&all_entries, &hasher, &mut hash_cache)?;
@@ -71,14 +74,30 @@ fn main() -> Result<()> {
             lhs_entries.remove(err_path);
         }
 
-        eprintln!("in cache:  {:6>} / {total:6>}", hash_result.cached.len());
-        eprintln!("hashed:    {:6>} / {total:6>}", hash_result.new.len());
-        eprintln!("failed:    {:6>} / {total:6>}", hash_result.failed.len());
-        eprintln!("not found: {:6>} / {total:6>}", hash_result.notfound.len());
-    }
+        (
+            hash_result.cached.len(),
+            hash_result.new.len(),
+            hash_result.failed.len(),
+            hash_result.notfound.len(),
+        )
+    } else {
+        let notfound: Vec<PathBuf> = all_entries
+            .into_iter()
+            .filter(|path| !path.exists())
+            .collect();
+        let notfound_len = notfound.len();
+        for err_path in notfound {
+            entries.remove(&err_path);
+            lhs_entries.remove(&err_path);
+        }
 
-    let dist_matrix: Arc<Mutex<HashMap<PathBuf, HashMap<PathBuf, u32>>>> =
-        Arc::new(Mutex::new(HashMap::new()));
+        (total, 0, 0, notfound_len)
+    };
+
+    eprintln!("in cache:  {cached:6>} / {total:6>}");
+    eprintln!("hashed:    {new:6>} / {total:6>}");
+    eprintln!("failed:    {failed:6>} / {total:6>}");
+    eprintln!("not found: {notfound:6>} / {total:6>}");
 
     // check against original args in case all LHS entries were invalid and removed
     let combs: Either<_, _> = if args.lhs_filenames.len() > 0 {
