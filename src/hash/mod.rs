@@ -72,7 +72,11 @@ where
     let mut new = Vec::new();
     let mut failed = Vec::new();
     results.iter().for_each(|(path, res)| match res {
-        Some(_) => new.push(path.clone()),
+        Some(_) => {
+            if !cached.contains(path) {
+                new.push(path.clone())
+            }
+        }
         None => {
             if !notfound.contains(path) {
                 failed.push(path.clone())
