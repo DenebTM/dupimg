@@ -23,7 +23,7 @@ where
         filenames
             .into_iter()
             .filter(|path| {
-                path.is_file()
+                !path.is_dir()
                     || !recurse && {
                         eprintln!("Ignoring '{}': --recurse not set", path.display());
                         false
