@@ -101,12 +101,13 @@ fn main() -> Result<()> {
     };
 
     eprintln!("Computing hamming distances... ");
+    let readonly_cache = hash_cache.readonly();
     combs.par_iter().for_each(|UniqueTuple(path1, path2)| {
         compare::compare(
             path1,
             path2,
             args.threshold,
-            &hash_cache,
+            &readonly_cache,
             dist_matrix.clone(),
         )
         .unwrap_or_else(|err| eprintln!("{err}"))

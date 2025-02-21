@@ -1,5 +1,5 @@
-use crate::hash::cache::HashCache;
 use anyhow::Result;
+use image_hasher::ImageHash;
 use std::{
     collections::HashMap,
     path::PathBuf,
@@ -10,7 +10,7 @@ pub fn compare(
     path1: &PathBuf,
     path2: &PathBuf,
     threshold: u32,
-    hash_cache: &HashCache,
+    hash_cache: &HashMap<PathBuf, ImageHash>,
     dist_matrix: Arc<Mutex<HashMap<PathBuf, HashMap<PathBuf, u32>>>>,
 ) -> Result<()> {
     let hash1 = hash_cache

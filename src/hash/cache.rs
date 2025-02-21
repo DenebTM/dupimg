@@ -128,7 +128,7 @@ impl HashCache {
         path: &PathBuf,
         init: impl FnOnce() -> Result<ImageHash>,
     ) -> Result<Arc<ImageHash>> {
-        Ok(match self.hashes.lock().unwrap().get(path).cloned() {
+        Ok(match self.get(path) {
             Some(img_hash) => img_hash,
 
             None => {
@@ -142,5 +142,14 @@ impl HashCache {
                 img_hash
             }
         })
+    }
+
+    pub fn readonly(&self) -> HashMap<PathBuf, ImageHash> {
+        let hashes = self.hashes.lock().unwrap();
+
+        hashes
+            .iter()
+            .map(|(path, hash_arc)| (path.clone(), (**hash_arc).clone()))
+            .collect()
     }
 }
